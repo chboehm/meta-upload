@@ -8,9 +8,10 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+
 import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.initMocks;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -21,7 +22,7 @@ public class IdaInputArchiverTest
     @InjectMocks
     private IdaInputArchiver cut;
 
-    private Path input = Paths.get("input.xml");
+    private Path input;
     private Path target;
 
     @Mock
@@ -34,20 +35,23 @@ public class IdaInputArchiverTest
     public void setUp() throws Exception
     {
         initMocks(this);
+        input = Files.createTempFile("input", ".xml");
         target = Files.createTempDirectory("idaInputArchiverTest");
     }
     
     @AfterMethod
-    public void cleanup()
+    public void cleanup() throws IOException
     {
         Directories.delete(target);
+        Files.delete(input);
     }    
 
     @Test
     public void archiveFile() throws Exception
     {
         Path path = cut.archiveFile(input, target);
-        assertThat(path, equalTo(target.resolve("input.xml.zip")));
+        Path expectedPath = target.resolve(input.getFileName().toString() + ".zip");
+        assertThat(path, equalTo(expectedPath));
         verify(zipService, times(1)).zip(any(Path.class), any(Path.class));
     }
 }
