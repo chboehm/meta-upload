@@ -1,1 +1,8 @@
 /test-output/
+/target/
+.idea
+.settings
+.project
+.classpath
+.buildpath
+.directory
