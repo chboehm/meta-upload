@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
 import de.idadachverband.archive.visitor.CopyFileVisitor;
 import de.idadachverband.archive.visitor.DeletingFileVisitor;
@@ -42,6 +43,7 @@ public class Directories
     
     public static Path findFirstFile(Path dir) throws IOException
     {
+        @Cleanup
         final DirectoryStream<Path> paths = Files.newDirectoryStream(dir);
         for (Path path : paths)
         {
