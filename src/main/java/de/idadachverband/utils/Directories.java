@@ -1,4 +1,4 @@
-package de.idadachverband.archive;
+package de.idadachverband.utils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -6,12 +6,11 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import de.idadachverband.archive.visitor.CopyFileVisitor;
-import de.idadachverband.archive.visitor.DeletingFileVisitor;
 
 @Slf4j
 public class Directories
@@ -56,7 +55,7 @@ public class Directories
         throw new FileNotFoundException(dir + " is empty");
     }
     
-    public static List<String> listDirectoryNames(Path dir)
+    public static List<String> listDirectoryNames(Path dir, boolean sort)
     {
         List<String> pathList = new ArrayList<>();
         if (Files.exists(dir)) {
@@ -75,6 +74,11 @@ public class Directories
             }
         }
        
+        if (sort)
+        {
+            Collections.sort(pathList);
+        }
+            
         return pathList;
     }
     

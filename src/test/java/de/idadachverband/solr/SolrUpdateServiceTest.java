@@ -6,7 +6,6 @@ import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 
 import org.apache.solr.client.solrj.SolrServerException;
 import org.mockito.Mock;
@@ -16,14 +15,15 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import de.idadachverband.archive.ArchiveService;
+import de.idadachverband.archive.BaseVersion;
 import de.idadachverband.archive.IdaInputArchiver;
+import de.idadachverband.archive.InstitutionArchive;
+import de.idadachverband.archive.UpdateVersion;
+import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.archive.VersionKey;
-import de.idadachverband.archive.bean.ArchiveVersionBean;
-import de.idadachverband.archive.bean.ArchiveBaseVersionBean;
-import de.idadachverband.hierarchy.HierarchyCacheDeleteMethod;
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.institution.IdaInstitutionConverter;
 import de.idadachverband.job.JobExecutionService;
+import de.idadachverband.vufind.VufindInstanceManager;
 
 public class SolrUpdateServiceTest
 {
@@ -39,28 +39,25 @@ public class SolrUpdateServiceTest
     
     @Mock
     private JobExecutionService jobExecutionService;
-    
+     
     @Mock
-    private IdaInstitutionConverter idaInstitutionConverter;
-    
-    @Mock
-    private HierarchyCacheDeleteMethod hierarchyCacheDeleteMethod; 
+    private VufindInstanceManager vufindInstanceManager;
     
     private final String coreName = "corename";
     
     @Mock 
-    private SolrService solrService;
+    private SolrCore solrCore;
     
     private final String institutionId = "institution1";
     
     @Mock
     private IdaInstitutionBean institution;
     
-    @Mock
-    private ArchiveBaseVersionBean versionBean;
+    private InstitutionArchive institutionArchive; 
     
-    @Mock
-    private ArchiveVersionBean updateBean1, updateBean2;
+    private BaseVersion baseVersion;
+    
+    private UpdateVersion updateVersion1, updateVersion2;
 
     private SolrUpdateService cut;
 
@@ -70,46 +67,50 @@ public class SolrUpdateServiceTest
         MockitoAnnotations.initMocks(this);
         
         when(institution.getInstitutionId()).thenReturn(institutionId);
-        when(solrService.getName()).thenReturn(coreName);
+        when(solrCore.getName()).thenReturn(coreName);
         when(idaInputArchiver.uncompressToTemporaryFile(Mockito.any(Path.class))).thenReturn(Paths.get("uncompressed.tmp"));
         
         // archived versions
-        when(versionBean.getSolrFormatFile()).thenReturn(versionPath);
-        when(versionBean.getBaseNumber()).thenReturn(1);
+        institutionArchive = new InstitutionArchive(institution);
+        when(archiveService.getArchive(institution)).thenReturn(institutionArchive);
         
-        when(updateBean1.getSolrFormatFile()).thenReturn(updatePath1);
-        when(updateBean1.getUpdateNumber()).thenReturn(1);
-        when(updateBean2.getSolrFormatFile()).thenReturn(updatePath2);
-        when(updateBean2.getUpdateNumber()).thenReturn(2);
+        baseVersion = new BaseVersion(new VersionKey(1, 0), new VersionInfo(), institutionArchive);
+        baseVersion.setSolrFormatFile(versionPath);
+        institutionArchive.addBaseVersion(baseVersion);
         
-        cut = new SolrUpdateService(archiveService, idaInputArchiver, jobExecutionService, hierarchyCacheDeleteMethod);
+        updateVersion1 = new UpdateVersion(new VersionKey(1, 1), new VersionInfo(), baseVersion);
+        updateVersion1.setSolrFormatFile(updatePath1);
+        baseVersion.addUpdate(updateVersion1);
+
+        updateVersion2 = new UpdateVersion(new VersionKey(1, 2), new VersionInfo(), baseVersion);
+        updateVersion2.setSolrFormatFile(updatePath2);
+        baseVersion.addUpdate(updateVersion2);
+        
+        cut = new SolrUpdateService(archiveService, idaInputArchiver, jobExecutionService, vufindInstanceManager);
     }
 
     @Test
-    public void reindexInstitution() throws Exception
+    public void rollbackInstitution() throws Exception
     {
         VersionKey version = new VersionKey(1,2); 
-        when(archiveService.getLatestVersionKey(coreName, institutionId)).thenReturn(version);
-        when(archiveService.getArchivedBaseVersion(coreName, institutionId, version)).thenReturn(versionBean);
-        when(versionBean.getUpdatesUpTo(2)).thenReturn(Arrays.asList(updateBean1, updateBean2));
+        when(archiveService.getIndexedVersionKey(institution, solrCore)).thenReturn(version);
         
-        cut.reindexInstitution(solrService, institution);
+        cut.rollbackInstitution(institution, solrCore);
 
-        verify(solrService, times(1)).deleteInstitution(institutionId);
-        verify(solrService, times(3)).update(Mockito.any(Path.class));
+        verify(solrCore, times(1)).deleteInstitution(institutionId);
+        verify(solrCore, times(3)).update(Mockito.any(Path.class));
     }
 
     @Test
     public void updateSolrRollback() throws Exception 
     {
         VersionKey version = new VersionKey(1,0); 
-        when(archiveService.getLatestVersionKey(coreName, institutionId)).thenReturn(version);
-    	when(archiveService.getArchivedBaseVersion(coreName, institutionId, version)).thenReturn(versionBean);
+        when(archiveService.getIndexedVersionKey(institution, solrCore)).thenReturn(version);
     	
     	final Path invalidUpdatePath = Paths.get("invalidupdate.xml");
-    	when(solrService.update(invalidUpdatePath)).thenThrow(new SolrServerException("updates fails"));
+    	when(solrCore.update(invalidUpdatePath)).thenThrow(new SolrServerException("updates fails"));
     	
-    	SolrUpdateBean solrUpdate = new SolrUpdateBean(solrService, institution, invalidUpdatePath, false);
+    	SolrUpdateBean solrUpdate = new SolrUpdateBean(solrCore, institution, invalidUpdatePath, VersionInfo.ofUpload("", ""), false);
     	try 
     	{
     	    cut.updateSolr(solrUpdate, true);
@@ -118,8 +119,8 @@ public class SolrUpdateServiceTest
     	    // expected
     	}
     	
-    	verify(solrService).update(invalidUpdatePath);
-    	verify(solrService).update(versionPath); // rollback to archived version
-    	verify(solrService, times(2)).deleteInstitution(institutionId);
+    	verify(solrCore).update(invalidUpdatePath);
+    	verify(solrCore).update(versionPath); // rollback to archived version
+    	verify(solrCore, times(2)).deleteInstitution(institutionId);
     }
 }

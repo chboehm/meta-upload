@@ -12,7 +12,6 @@
 <body>
     <%@include file="menu.jspf" %>
     <div class="main">
-        <h1>You successfully uploaded one file</h1>
         <spring:url value="/files/solrFormat/" var="fileUrl"/>
         <spring:url value="/result/getResult" var="stateUrl"/>
         <spring:url value="/resources/images/waiting.gif" var="waiting"/>
@@ -22,35 +21,50 @@
                 <img src="${waiting}">
             </div>
             <div style="display: inline-block; padding-left: 20px; vertical-align: top">
-                <h2>Job ID: ${jobId}</h2>
-                Processing may take a little longer. You can close this window.<br />
-                You will be informed by e-mail about the outcome.
+            	<h1>Die Daten werden verarbeitet...</h1>
+                <p>Die Verarbeitung kann eine Weile dauern. Sie können dieses Fenster jetzt schließen.<br />
+                Sie werden über das Ergebnis per Mail informiert.</p>
+                <sec:authorize access="hasAuthority('admin')">
+	                Job ID: ${jobId}
+                </sec:authorize>
             </div>
         </div>
 
-        <div id="filelink" style="display: none;">
-            <h2>Done</h2>
-            <a href="${fileUrl}" target="_blank">Transformed XML file</a>
+        <div id="success" style="display: none;">
+            <h1>Verarbeitung der Daten erfolgreich!</h1>
+            <p>Die Daten wurden erfolgreich eingespielt. Bitte überprüfe Sie die Daten auf <a id="instanceLink" target="_blank"></a></p>
+           	<%-- <a id="filelink" href="${fileUrl}" target="_blank">Transformierte XML-Datei</a> --%>
         </div>
 
         <div id="failure" style="display: none;">
-            <h2>Error!</h2>
-            <div id="exception"></div>
+            <h1>Fehler bei der Verarbeitung!</h1>
+            <p>Die Daten konnten nicht umgewandelt werden. Bitte kontaktieren Sie die Servicestelle.</p>
+            <sec:authorize access="hasAuthority('admin')">
+            	<h2>Exception: </h2>
+            	<div id="exception"></div>
+            </sec:authorize>
         </div>
         
-        <div id="jobMessage" style="display: none;">
-            <h2>Job message: </h2>
-            <div id="message"></div>
-        </div>
+        <sec:authorize access="hasAuthority('admin')">
+	        <div id="jobMessage" style="display: none;">
+	            <h2>Job Message: </h2>
+	            <div id="message"></div>
+	        </div>
+        </sec:authorize>
 
         <script type="application/javascript">
             successCallback = function (v) {
                 console.log(v);
                 if (v.state === "<%= JobProgressState.SUCCESS %>") {
-                    var link = jQuery("#filelink").find("a");
-                    var url = link.attr("href");
-                    link.attr("href", url + v.path);
-                    jQuery("#filelink").toggle();
+                    var instanceLink = jQuery("#instanceLink");
+                    instanceLink.attr("href", v.instanceUrl);
+                    instanceLink.text(v.instanceUrl);
+
+                    /* var fileLink = jQuery("#filelink");
+                    var url = fileLink.attr("href");
+                    fileLink.attr("href", url + v.path); */
+                    
+                    jQuery("#success").toggle();
                     done();
                 }
                 else if (v.state === "<%= JobProgressState.FAILURE %>") {

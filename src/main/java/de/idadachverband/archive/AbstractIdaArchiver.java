@@ -37,20 +37,20 @@ public class AbstractIdaArchiver
      * @return
      * @throws java.io.IOException
      */
-    public Path archiveFile(Path input, Path targetFolder) throws IOException
+    public Path archiveFile(Path input, Path targetFolder, String filePrefix) throws IOException
     {
         log.debug("Archive file: {} to folder: {}", input, targetFolder);
         Files.createDirectories(targetFolder);
         final Path path;
         if (!zip || inputIsZip(input))
         {
-            path = targetFolder.resolve(input.getFileName());
+            path = targetFolder.resolve(filePrefix + input.getFileName());
             log.info("Zip disabled or file: {} is a zip file. Copy to: {}", input, path);
             Files.copy(input, path);
             log.debug("Copied: {} to:  {}", input, path);
         } else
         {
-            path = targetFolder.resolve(input.getFileName() + ".zip");
+            path = targetFolder.resolve(filePrefix + input.getFileName() + ".zip");
             zipService.zip(input, path);
             log.debug("Zipped: {} as: {}", input, path);
         }

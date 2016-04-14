@@ -13,12 +13,12 @@ public class ReindexJobBean extends JobBean
 {
     private final List<SolrUpdateBean> solrUpdates = new ArrayList<>();
    
-    private final SolrService solrService;
+    private final SolrCore solrService;
     private final IdaInstitutionBean institution;
     private final VersionKey version;
 
     
-    public ReindexJobBean(SolrService solrService,
+    public ReindexJobBean(SolrCore solrService,
             IdaInstitutionBean institution, VersionKey version)
     {
         this.solrService = solrService;

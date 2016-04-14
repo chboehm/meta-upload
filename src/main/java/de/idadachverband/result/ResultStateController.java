@@ -5,6 +5,7 @@ import de.idadachverband.job.JobProgressService;
 import de.idadachverband.job.JobProgressState;
 import de.idadachverband.process.ProcessJobBean;
 import de.idadachverband.transform.TransformationBean;
+import de.idadachverband.vufind.VufindInstanceManager;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Controller;
@@ -37,6 +38,9 @@ public class ResultStateController
 
     @Inject
     private JobProgressService jobProgressService;
+    
+    @Inject 
+    private VufindInstanceManager vufindInstanceManager;
 
     @RequestMapping(value = "getResult", produces = "application/json")
     @ResponseBody
@@ -56,12 +60,12 @@ public class ResultStateController
         {
             if (jobBean != null && jobBean instanceof ProcessJobBean)
             {
-                TransformationBean transformationBean = ((ProcessJobBean) jobBean).getTransformation();
+                TransformationBean transformation = ((ProcessJobBean) jobBean).getTransformation();
                 Path path = Paths.get(
-                        transformationBean.getCoreName(), 
-                        transformationBean.getInstitutionId(), 
-                        transformationBean.getArchivedVersion().toString());
+                        transformation.getInstitutionId(), 
+                        transformation.getArchivedVersion().toString());
                 result.add("path", path.toString());
+                result.add("instanceUrl", vufindInstanceManager.getInstancePublicUrl(transformation.getCoreName()));
             }
         }
         if (state == FAILURE)

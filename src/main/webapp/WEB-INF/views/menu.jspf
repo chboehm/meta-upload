@@ -2,18 +2,18 @@
 
 <header>
     <div id="slogan">
-        File-Upload<br />Metadaten-Katalog
+        Daten-Upload<br />Meta-Katalog
     </div>
     <div id="logo">
     </div>
     <div id="mainMenu">
         <ul id="menuTabs">
             <li class="${(currentTab eq 'upload') ? ' active' : ''}">
-                <a href="${url}">Upload file</a>
+                <a href="${url}">Datei hochladen</a>
             </li>
 			<sec:authorize access="hasAuthority('admin')">
 				<li class="${(currentTab eq 'archive') ? ' active' : ''}">
-					<a href="${archive}">Archive</a>
+					<a href="${archive}">Archiv</a>
 				</li>
 				<li class="${(currentTab eq 'jobs') ? ' active' : ''}">
 					<a href="${jobsUrl}">Jobs</a>
@@ -22,10 +22,10 @@
 		</ul>
         <ul id="userStatus">
             <li class="userName">
-                <a id="username">Hello ${user}!</a>
+                <a id="username">Hallo ${user}!</a>
             </li>
             <li>
-                <a href="${logoutUrl}">Logout</a>
+                <a href="${logoutUrl}">Abmelden</a>
             </li>
         </ul>
     </div>

@@ -4,7 +4,7 @@ package de.idadachverband.job;
 import de.idadachverband.institution.IdaInstitutionBean;
 import de.idadachverband.job.JobProgressService;
 import de.idadachverband.job.JobProgressState;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
@@ -22,7 +22,7 @@ public class JobProgressServiceTest
 {
 
     @Mock
-    private SolrService solrService;
+    private SolrCore solrService;
     @Mock
     private IdaInstitutionBean institutionBean;
     

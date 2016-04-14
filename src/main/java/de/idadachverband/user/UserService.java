@@ -9,7 +9,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -30,24 +30,24 @@ public class UserService
      
     private Map<String, IdaInstitutionBean> institutionsMap;
     
-    private Map<String, SolrService> solrServiceMap;
+    private Map<String, SolrCore> solrServiceMap;
 
-    private SolrService defaultSolrUpdater;
+    private SolrCore defaultSolrUpdater;
 
     @Value("${result.mail.from}")
     private String mailFrom;
     
     @Inject
     public UserService(Set<IdaInstitutionBean> institutionsSet,
-            Set<SolrService> solrServiceSet, SolrService defaultSolrUpdater)
+            Set<SolrCore> solrServiceSet, SolrCore defaultSolrUpdater)
     {
         this.institutionsMap = new HashMap<String, IdaInstitutionBean>(institutionsSet.size());
         for (IdaInstitutionBean institution : institutionsSet) 
         {
             institutionsMap.put(institution.getInstitutionId(), institution);
         }
-        this.solrServiceMap = new HashMap<String, SolrService>(solrServiceSet.size());
-        for (SolrService solrService : solrServiceSet) 
+        this.solrServiceMap = new HashMap<String, SolrCore>(solrServiceSet.size());
+        for (SolrCore solrService : solrServiceSet) 
         {
             solrServiceMap.put(solrService.getName(), solrService);
         }
@@ -76,7 +76,7 @@ public class UserService
             else if (userDetail.startsWith("#"))
             {
                 String coreName = userDetail.substring(1);
-                SolrService solrService = solrServiceMap.get(coreName);
+                SolrCore solrService = solrServiceMap.get(coreName);
                 if (solrService != null)
                 {
                     log.debug("Found solr service {} for user {}", solrService, user);

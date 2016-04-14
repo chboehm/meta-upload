@@ -3,7 +3,9 @@ package de.idadachverband.solr;
 import java.nio.file.Path;
 import java.util.UUID;
 
-import de.idadachverband.archive.VersionKey;
+import de.idadachverband.archive.BaseVersion;
+import de.idadachverband.archive.UpdateVersion;
+import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.institution.IdaInstitutionBean;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -13,29 +15,27 @@ import lombok.EqualsAndHashCode;
 public class SolrUpdateBean
 {
     private final String key;
-    private final SolrService solrService;
+    private final SolrCore solrCore;
     private final IdaInstitutionBean institution;
+    private final VersionInfo origin;
     private final boolean incrementalUpdate;
     
     private Path solrInput;
     private String solrMessage = "";
     
-    // used for re-indexing of archived files
-    private VersionKey originalVersion = VersionKey.NO_VERSION;
-    private VersionKey archivedVersion = VersionKey.NO_VERSION;
-    
-    public SolrUpdateBean(SolrService solrService, IdaInstitutionBean institution, Path solrInput, boolean incrementalUpdate)
+    public SolrUpdateBean(SolrCore solrService, IdaInstitutionBean institution, Path solrInput, VersionInfo origin, boolean incrementalUpdate)
     {
         this.key = UUID.randomUUID().toString();
-        this.solrService = solrService;
+        this.solrCore = solrService;
         this.institution = institution;
         this.solrInput = solrInput;
+        this.origin = origin;
         this.incrementalUpdate = incrementalUpdate;
     }
     
     public String getCoreName()
     {
-        return solrService.getName();
+        return solrCore.getName();
     }
     
     public String getInstitutionId() 
@@ -63,5 +63,21 @@ public class SolrUpdateBean
             sb.append(solrMessage);
             sb.append('\n');
         }
+    }
+    
+    public static SolrUpdateBean fromUpdateVersion(UpdateVersion updateVersionArchive, SolrCore solrService, String userName)
+    {
+        return new SolrUpdateBean(solrService, updateVersionArchive.getInstitution(), 
+                updateVersionArchive.getSolrFormatFile(), 
+                VersionInfo.ofReindex(userName, updateVersionArchive.getVersionKey()), 
+                true);
+    }
+
+    public static SolrUpdateBean fromBaseVersion(BaseVersion baseVersionArchive, SolrCore solrService, String userName)
+    {
+        return new SolrUpdateBean(solrService, baseVersionArchive.getInstitution(), 
+                baseVersionArchive.getSolrFormatFile(),
+                VersionInfo.ofReindex(userName, baseVersionArchive.getVersionKey()),
+                false);
     }
 }

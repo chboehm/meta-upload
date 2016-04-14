@@ -6,13 +6,13 @@
     <%@include file="menu.jspf" %>
     <div class="main" id="page-upload">
         <h1>
-            Please upload a file.
+            Bitte laden Sie eine Datei hoch.
             <sec:authorize access="hasAuthority('admin')">
-                You are admin!
+                Sie sind Admin!
             </sec:authorize>
         </h1>
         <form:form method="post" action="upload" enctype="multipart/form-data" modelAttribute="transformation">
-            <form:label path="file">File to upload</form:label>
+            <form:label path="file">Datei zum Hochladen</form:label>
             <form:input path="file" type="file" name="file"/><br/>
             <br />
             <div style="display: none;"><sec:authorize access="hasAuthority('admin')"></div><div></sec:authorize>
@@ -32,7 +32,7 @@
                 <br/>
             </div>
             <div style="display: none;"><c:if test="${institutions.size() gt 1}"></div><div></c:if>
-                <form:label path="institution">Library/Archive</form:label>
+                <form:label path="institution">Einrichtung</form:label>
                 <form:select path="institution">
                 	<c:forEach items="${institutions}" var="institution">
     					<form:option value="${institution.institutionId}" label="${institution.institutionName}"/>
@@ -41,12 +41,14 @@
                 <br/>
             </div>
             <c:if test="${allowIncremental}">
-                <form:checkbox path="incremental" value="${incrementalDefault}" label="Incremental update"/>
-                <span class="infoBubble" title="An incremental update is one that provides the changes since the last incremental update.">i</span><br />
+            	<form:radiobutton path="update" value="true" label="Schrittweises Update"/><label class="buttonDescription">Neue Daten seit letztem Update hinzufügen.</label><br/>
+            	<form:radiobutton path="update" value="false" label="Volles Update"/><label class="buttonDescription">Existierende Daten löschen und durch neue Daten ersetzen.</label><br/>
                 <br/>
             </c:if>
-            <input type="submit" value="Upload" class="btn" />
-            <label class="buttonDescription">Click the button to upload the file!</label>
+            <div>
+	            <input type="submit" value="Senden" class="btn" />
+	            <label class="buttonDescription">Klicken sie auf Senden um die Datei hochzuladen!</label>
+            </div>
         </form:form>
     </div>
     <%@include file="footer.jspf" %>

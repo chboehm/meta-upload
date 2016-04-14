@@ -1,5 +1,6 @@
 package de.idadachverband.archive;
 
+import de.idadachverband.utils.Directories;
 import de.idadachverband.utils.ZipService;
 
 import org.mockito.InjectMocks;
@@ -49,7 +50,7 @@ public class IdaInputArchiverTest
     @Test
     public void archiveFile() throws Exception
     {
-        Path path = cut.archiveFile(input, target);
+        Path path = cut.archiveFile(input, target, "");
         Path expectedPath = target.resolve(input.getFileName().toString() + ".zip");
         assertThat(path, equalTo(expectedPath));
         verify(zipService, times(1)).zip(any(Path.class), any(Path.class));

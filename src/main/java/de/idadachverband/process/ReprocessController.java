@@ -14,28 +14,28 @@ import org.springframework.web.bind.annotation.RequestParam;
 import de.idadachverband.archive.ArchiveException;
 import de.idadachverband.archive.VersionKey;
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.job.BatchJobBean;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 
 @Slf4j
 @Controller
 @RequestMapping("/process")
 public class ReprocessController
 {
-    private final ReprocessService reprocessService;
+    private final ProcessService processService;
     
     @Inject
-    public ReprocessController(ReprocessService reprocessService)
+    public ReprocessController(ProcessService processService)
     {
-        this.reprocessService = reprocessService;
+        this.processService = processService;
     }
     
+/*
     @RequestMapping(value = "reprocess/{solrService}", method = RequestMethod.GET)
     public String reprocessCore(
             @PathVariable("solrService") SolrService solrService,
             ModelMap map) throws ArchiveException
     {
-        BatchJobBean jobBean = reprocessService.reprocessCoreAsync(solrService);
+        BatchJobBean jobBean = reprocessService.reprocessAllAsync(solrService);
         map.addAttribute("core", solrService.getName());
         map.addAttribute("institution", "ALL");
         map.addAttribute("version", "LATEST");
@@ -43,7 +43,8 @@ public class ReprocessController
 
         return "redirect:/process/reprocessing";
     }
-    
+*/
+/*
     @RequestMapping(value = "reprocess/{solrService}/{institution}", method = RequestMethod.GET)
     public String reprocessInstitution(
             @PathVariable("solrService") SolrService solrService,
@@ -70,10 +71,11 @@ public class ReprocessController
         }
         return "redirect:/process/reprocessing";
     }
+*/
       
     @RequestMapping(value = "reprocess/{solrService}/{institution}/{version:.+}", method = RequestMethod.GET)
     public String reprocessVersion(
-            @PathVariable("solrService") SolrService solrService,
+            @PathVariable("solrService") SolrCore solrService,
             @PathVariable("institution") IdaInstitutionBean institution,
             @PathVariable("version") String version,
             ModelMap map)
@@ -83,7 +85,7 @@ public class ReprocessController
         map.addAttribute("version", version);
         try
         {
-            ReprocessJobBean jobBean = reprocessService.reprocessVersionAsync(solrService, institution, VersionKey.parse(version));
+            ReprocessJobBean jobBean = processService.reprocessVersionAsync(solrService, institution, VersionKey.parse(version));
             map.addAttribute("jobId", jobBean.getJobId());
         } catch (ArchiveException e)
         {

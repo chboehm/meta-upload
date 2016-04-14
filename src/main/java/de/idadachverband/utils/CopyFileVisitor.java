@@ -1,4 +1,4 @@
-package de.idadachverband.archive.visitor;
+package de.idadachverband.utils;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;

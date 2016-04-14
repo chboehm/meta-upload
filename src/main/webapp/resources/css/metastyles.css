@@ -83,7 +83,7 @@ ol, ul {
 label {
   display: inline-block;
   font-weight: normal;
-  min-width: 120px; }
+  min-width: 140px; }
 
 table {
   border-collapse: collapse;
@@ -141,7 +141,9 @@ select {
   font-family: serif;
   font-weight: bold;
   text-align: center;
-  width: 18px; }
+  width: 18px;
+  height: 18px;
+  line-height: 18px; }
 
 .main {
   margin: 70px 40px; }
@@ -180,6 +182,48 @@ select {
     font-family: 'icomoon';
     font-size: 16px;
     font-weight: normal; }
+  
+.dropdown {
+  margin: 0 5px;
+  position: relative;
+  display: inline-block;
+  line-height: 1em;
+}
+.dropdown > button {
+  border: none;
+  cursor: pointer;
+}
+.dropdown > button:after {
+  content: "  ▼";
+} 
+.dropdown > ul {
+  display: none;
+  position: absolute;
+  min-width: 160px;
+  background-color: white;
+  border: 1px solid #CCC;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 99;
+}
+.dropdown.open > ul {
+  display: block; }
+
+.dropdown > ul > li:hover, .dropdown > ul > li:focus {
+  background-color: #CCC; }
+
+a.option {
+  display: inline-block;
+  width: 100%;
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 30px;
+  margin-left: 6px;
+  margin-right: 6px; }
+  
+.options {
+  display: inline-block;
+  float: right; 
+  margin: 0 6px; }
 
 header {
   background-color: #ffce67;
@@ -217,8 +261,6 @@ header {
         header #mainMenu #menuTabs li.active, header #mainMenu #userStatus li.active {
           background-color: white;
           margin-left: -4px; }
-        header #mainMenu #menuTabs li.userName, header #mainMenu #userStatus li.userName {
-          font-family: "Libre Baskerville",serif; }
         header #mainMenu #menuTabs li a, header #mainMenu #userStatus li a {
           display: inline-block;
           padding: 0 30px;
@@ -233,21 +275,42 @@ header {
       margin-right: 20px; }
 
 #page-archiveList .institutionList > li {
+  max-width: 600px;
   border-bottom: 1px solid #CCC;
-  margin-bottom: 30px;
-  padding-bottom: 30px; }
+  margin-bottom: 6px;
+  padding-bottom: 6px; 
+  line-height: 50px; }
+  #page-archiveList .institutionList > li > .latest {
+    float: right; }
   #page-archiveList .institutionList > li:last-child {
     border: 0 none;
     margin-bottom: 0;
     padding-bottom: 0; }
+
+#page-archiveList .versionList > li {
+  max-width: 1000px;
+  border-bottom: 1px solid #CCC;
+  margin-bottom: 6px;
+  padding-bottom: 6px; 
+  line-height: 50px; }
+  #page-archiveList .versionList > li .version {
+    display: inline-block;
+    min-width: 85px; }
+  #page-archiveList .versionList > li > .indexStates {
+    display: inline-block;
+    margin-left: 6px; }
+  #page-archiveList .versionList > li:last-child {
+    border: 0 none;
+    margin-bottom: 0;
+    padding-bottom: 0; }
+    
 #page-archiveList a.btn {
   line-height: 20px;
   margin-left: 10px;
   margin-right: 10px; }
+
 #page-archiveList a.delete {
   margin-left: 15px; }
-#page-archiveList li {
-  line-height: 50px; }
 
 #page-jobs ul.jobs li {
   background-color: #d6d3de;

@@ -19,7 +19,7 @@ import java.nio.file.Path;
  */
 @Slf4j
 @EqualsAndHashCode(of = "name")
-public class SolrService
+public class SolrCore
 {
     private static final String INSTITUTION_ID = "institutionID";
     
@@ -31,7 +31,7 @@ public class SolrService
     private final String url;
 
 
-    public SolrService(String name, String url)
+    public SolrCore(String name, String url)
     {
         this.name = name;
         this.url = url;

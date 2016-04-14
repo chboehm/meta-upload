@@ -11,19 +11,27 @@
     <context:property-placeholder location="file:/var/local/ida/upload.properties"/>
 
     <!-- Solr -->
-    <bean id="defaultSolrUpdater" class="de.idadachverband.solr.SolrService">
+    <bean id="defaultSolrCore" class="de.idadachverband.solr.SolrCore">
         <constructor-arg index="0" value="Meta"/>
         <constructor-arg index="1" value="${solr.url}"/>
     </bean>
-    <bean id="genderbibSolrUpdater" class="de.idadachverband.solr.SolrService">
-        <constructor-arg index="0" value="Genderbib"/>
-        <constructor-arg index="1" value="${solr.url.genderbib}"/>
-    </bean>
-
-    <util:set id="solrServiceSet" set-class="java.util.HashSet" value-type="de.idadachverband.solr.SolrService">
-        <ref bean="defaultSolrUpdater"/>
-        <ref bean="genderbibSolrUpdater"/>
+    
+    <util:set id="solrCoreSet" set-class="java.util.HashSet" value-type="de.idadachverband.solr.SolrCore">
+        <ref bean="defaultSolrCore"/>
     </util:set>
+
+    <!-- Vufind -->
+    
+    <bean id="stageInstance" class="de.idadachverband.vufind.VufindInstanceBean">
+    		<constructor-arg index="0" name="instanceId" value="Meta"/>
+        	<constructor-arg index="1" name="url" value="${stage.url}"/>
+        	<constructor-arg index="2" name="publicUrl" value="http://stage.meta-katalog.de"/>
+   	</bean>
+    
+    <util:set id="vufindInstanceSet" set-class="java.util.HashSet"
+    		  value-type="de.idadachverband.vufind.VufindInstanceBean">
+    	<ref bean="stageInstance"/>
+ 	</util:set>
 
     <!-- XSLT -->
     <bean id="genderbib" class="de.idadachverband.institution.IdaInstitutionBean">
@@ -333,10 +341,5 @@
     
     <bean id="maxArchivedVersions" class="java.lang.Integer">
     	<constructor-arg value="6"/>
-    </bean>
-    
-    <bean id="hierarchyCacheDeleteMethod" class="de.idadachverband.hierarchy.HierarchyCacheDeleteMethod">
-     	<constructor-arg index="0" name="urlTemplate" value="http://meta-katalog.eu/HierarchyHelper?institution=$institutionId"/>
-        <constructor-arg index="1" name="institutionIdPlaceholder" value="$institutionId"/>
     </bean>
 </beans>

@@ -12,7 +12,6 @@
 <body>
     <%@include file="menu.jspf" %>
     <div class="main">
-        <h1>You successfully started the re-indexing of the archived upload version ${version} for ${institution} on ${core}.</h1>
         <spring:url value="/files/" var="fileUrl"/>
         <spring:url value="/result/getResult" var="stateUrl"/>
         <spring:url value="/resources/images/waiting.gif" var="waiting"/>
@@ -22,26 +21,34 @@
                 <img src="${waiting}">
             </div>
             <div style="display: inline-block; padding-left: 20px; vertical-align: top">
-                <h2>Job ID: ${jobId}</h2>
-                Processing may take a little longer. You can close this window.<br />
-                You will be informed by e-mail about the outcome.
+                <h1>Die Version ${version} von ${institution} wird nach ${core} indiziert...</h1>
+                <p>Die Verarbeitung kann eine Weile dauern. Sie können dieses Fenster jetzt schließen.<br />
+                Sie werden über das Ergebnis per Mail informiert.</p>
+                Job ID: ${jobId}
             </div>
         </div>
 
         <div id="success" style="display: none;">
-            <h2>Done</h2>
+            <h1>Indizierung der Version ${version} von ${institution} nach ${core} erfolgreich!</h1>
+            <p>Die Daten wurden erfolgreich eingespielt.</p>
         </div>
 
         <div id="failure" style="display: none;">
-            <h2>Error!</h2>
+            <h1>Indizierung der Version ${version} von ${institution} nach ${core} fehlgeschlagen!</h1>
+            <h2>Exception: </h2>
             <div id="exception"></div>
+        </div>
+
+		<div id="jobMessage" style="display: none;">
+	            <h2>Job Message: </h2>
+	            <div id="message"></div>
         </div>
 
         <script type="application/javascript">
             successCallback = function (v) {
                 console.log(v);
                 if (v.state === "<%= JobProgressState.SUCCESS %>") {
-                    jQuery("#success").toggle();
+                	jQuery("#success").toggle();
                     done();
                 }
                 else if (v.state === "<%= JobProgressState.FAILURE %>") {
@@ -49,6 +56,11 @@
                     jQuery("#exception").text(v.exception);
                     failure.toggle();
                     done();
+                }
+                if (v.message) {
+                	var jobMessage = jQuery("#jobMessage");
+	                jQuery("#message").html(v.message);
+    	            jobMessage.toggle(true);
                 }
             };
 

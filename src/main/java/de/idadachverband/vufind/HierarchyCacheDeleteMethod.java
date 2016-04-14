@@ -1,4 +1,4 @@
-package de.idadachverband.hierarchy;
+package de.idadachverband.vufind;
 
 import java.io.InputStream;
 import java.net.URL;

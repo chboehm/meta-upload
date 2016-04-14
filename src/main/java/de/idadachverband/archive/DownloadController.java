@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import de.idadachverband.institution.IdaInstitutionBean;
 import de.idadachverband.process.ProcessStep;
-import de.idadachverband.solr.SolrService;
 import de.idadachverband.user.IdaUser;
 import de.idadachverband.user.UserService;
 
@@ -41,24 +40,23 @@ public class DownloadController
         this.userService = userService;
     }
     
-    @RequestMapping(value = "/files/{step}/{core}/{institution}/{version:.+}", method = RequestMethod.GET)
+    @RequestMapping(value = "/files/{step}/{institution}/{version:.+}", method = RequestMethod.GET)
     @ResponseBody
     public FileSystemResource downloadVersion(
             @PathVariable("step") String stepName, 
-            @PathVariable("core") SolrService solr,
             @PathVariable("institution") IdaInstitutionBean institution,
             @PathVariable("version") String version,
             HttpServletResponse response) throws ArchiveException
     {
         IdaUser user = userService.getUser();
-        if (!user.getSolrServiceSet().contains(solr) || !user.getInstitutionsSet().contains(institution)) 
+        if (!user.getInstitutionsSet().contains(institution)) 
         {
-            log.warn("User {} tried to access file of {}, {}.", user, solr, institution);
-            throw new AccessDeniedException(solr.getName() + "/" + institution.getInstitutionId());
+            log.warn("User {} tried to access file of {}.", user, institution);
+            throw new AccessDeniedException(institution.getInstitutionId());
         }
         
         ProcessStep step = ProcessStep.valueOf(stepName);
-        Path path = archiveService.findFile(step, solr.getName(), institution.getInstitutionId(), VersionKey.parse(version));
+        Path path = archiveService.findFile(step, institution.getInstitutionId(), VersionKey.parse(version));
         response.setContentType("application/zip");
         response.setHeader("content-Disposition", "attachment; filename=" + path.getFileName());
 

@@ -144,7 +144,7 @@ public class JobProgressService
             @Override
             public int compare(JobBean o1, JobBean o2)
             {
-                return o1.getStartTime().compareTo(o2.getStartTime());
+                return o2.getStartTime().compareTo(o1.getStartTime());
             }
         });
         return result;
@@ -164,7 +164,7 @@ public class JobProgressService
             @Override
             public int compare(JobBean o1, JobBean o2)
             {
-                return o1.getStartTime().compareTo(o2.getStartTime());
+                return o2.getStartTime().compareTo(o1.getStartTime());
             }
         });
         return result;

@@ -9,7 +9,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,7 +32,7 @@ public class UserServiceTest
     private UserDetails userDetails;
    
     @Mock 
-    private SolrService solrService;
+    private SolrCore solrService;
     
     @Mock
     private IdaInstitutionBean institution;
@@ -96,7 +96,7 @@ public class UserServiceTest
     @Test 
     void getSolrServiceSet()
     {
-        final Set<SolrService> actual = cut.getUser().getSolrServiceSet();
+        final Set<SolrCore> actual = cut.getUser().getSolrServiceSet();
         
         assertThat(actual, equalTo(Collections.singleton(solrService)));
     }

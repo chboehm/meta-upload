@@ -7,7 +7,7 @@ import lombok.Getter;
 import de.idadachverband.archive.VersionKey;
 import de.idadachverband.institution.IdaInstitutionBean;
 import de.idadachverband.job.JobBean;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 import de.idadachverband.transform.TransformationBean;
 
 @Getter
@@ -15,12 +15,12 @@ public class ReprocessJobBean extends JobBean
 {
     private final List<TransformationBean> transformations = new ArrayList<>();
     
-    private final SolrService solrService;
+    private final SolrCore solrService;
     private final IdaInstitutionBean institution;
     private final VersionKey version;
     
 
-    public ReprocessJobBean(SolrService solrService,
+    public ReprocessJobBean(SolrCore solrService,
             IdaInstitutionBean institution, VersionKey version)
     {
         setJobName(String.format("Re-process archived upload version %s for %s, %s", 

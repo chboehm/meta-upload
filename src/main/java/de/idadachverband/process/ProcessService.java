@@ -1,19 +1,24 @@
 package de.idadachverband.process;
 
+import de.idadachverband.archive.AbstractVersion;
 import de.idadachverband.archive.ArchiveException;
 import de.idadachverband.archive.ArchiveService;
-import de.idadachverband.archive.Directories;
+import de.idadachverband.archive.BaseVersion;
 import de.idadachverband.archive.IdaInputArchiver;
-import de.idadachverband.archive.ProcessFileConfiguration;
-import de.idadachverband.archive.bean.VersionOrigin;
+import de.idadachverband.archive.InstitutionIndexState;
+import de.idadachverband.archive.InstitutionArchive;
+import de.idadachverband.archive.VersionInfo;
+import de.idadachverband.archive.VersionKey;
 import de.idadachverband.institution.IdaInstitutionBean;
 import de.idadachverband.job.JobCallable;
 import de.idadachverband.job.JobExecutionService;
 import de.idadachverband.solr.SolrUpdateService;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 import de.idadachverband.transform.IdaTransformer;
 import de.idadachverband.transform.TransformationBean;
 import de.idadachverband.transform.xslt.WorkingFormatToSolrDocumentTransformer;
+import de.idadachverband.utils.Directories;
+import de.idadachverband.vufind.VufindInstanceManager;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.inject.Inject;
@@ -22,9 +27,13 @@ import javax.xml.transform.TransformerException;
 
 import org.apache.solr.client.solrj.SolrServerException;
 
+import com.google.common.collect.Collections2;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by boehm on 09.10.14.
@@ -45,8 +54,8 @@ public class ProcessService
 
     final private SolrUpdateService solrUpdateService;
     
+    final private VufindInstanceManager vufindInstanceManager;
     
-
 
     @Inject
     public ProcessService(IdaTransformer transformationStrategy,
@@ -55,7 +64,8 @@ public class ProcessService
                                ProcessFileConfiguration processFileConfiguration,
                                ArchiveService archiveService,
                                SolrUpdateService solrUpdateService,
-                               JobExecutionService jobExecutionService)
+                               JobExecutionService jobExecutionService,
+                               VufindInstanceManager vufindInstanceManager)
     {
         this.idaInputArchiver = idaInputArchiver;
         this.workingFormatTransformer = workingFormatTransformer;
@@ -63,62 +73,66 @@ public class ProcessService
         this.archiveService = archiveService;
         this.solrUpdateService = solrUpdateService;
         this.jobExecutionService = jobExecutionService;
+        this.vufindInstanceManager = vufindInstanceManager;
     }
 
-    public ProcessJobBean processAsync(final Path input, final IdaInstitutionBean institution, final SolrService solr, String originalFileName, boolean incrementalUpdate) throws IOException
+    public ProcessJobBean processAsync(final Path input, final IdaInstitutionBean institution, final SolrCore solr, boolean incrementalUpdate, VersionInfo origin) throws IOException
     {
-        log.info("Start processing of: {} for institution: {} on Solr core: {}", originalFileName, institution, solr);
+        log.info("Start processing of: {} for institution: {} on Solr core: {}", origin.getUploadedFileName(), institution, solr);
         final ProcessJobBean processJobBean = new ProcessJobBean(
-                new TransformationBean(solr, institution, input, incrementalUpdate));
+                new TransformationBean(solr, institution, input, origin, incrementalUpdate));
         processJobBean.setJobName(String.format("Process file %s for %s, %s", 
-                originalFileName, solr.getName(), institution.getInstitutionName()));
+                origin.getUploadedFileName(), solr.getName(), institution.getInstitutionName()));
         
         jobExecutionService.executeAsynchronous(processJobBean, new JobCallable<ProcessJobBean>()
         {
             @Override
             public void call(ProcessJobBean jobBean) throws Exception
             {
-                process(jobBean.getTransformation(), jobBean.getUser().getUsername());
+                process(jobBean.getTransformation());
             }
         });
         return processJobBean;
     }
     
-    /**
-     * @param input              The input file to process
-     * @param institution        The institution to which the file belongs
-     * @param solr               The solr instance to update
-     * @param transformationBean Bean holding process information
-     * @return
-     * @throws IOException 
-     * @throws TransformerException 
-     * @throws SolrServerException 
-     * @throws ArchiveException 
-     */
-    public void process(TransformationBean transformationBean, String username) throws TransformerException, IOException, SolrServerException, ArchiveException
+    protected void process(TransformationBean transformation) throws TransformerException, IOException, SolrServerException, ArchiveException
     {
         try
         {
-            transform(transformationBean);
+            transform(transformation);
             
-            solrUpdateService.updateSolr(transformationBean, true);
+            InstitutionArchive institutionArchive = archiveService.getArchive(transformation.getInstitution());
+            InstitutionIndexState indexState = institutionArchive.getIndexState(transformation.getSolrCore());
+            synchronized (indexState)
+            {
+                solrUpdateService.updateSolr(transformation, true);
 
-            archiveService.archive(transformationBean, VersionOrigin.UPLOAD, username);
-            
-            deleteProcessingFolder(transformationBean.getKey()); // keep folder if processing fails
-            
-        } finally
+                AbstractVersion archivedVersion = archiveService.archive(transformation);                
+                archiveService.updateInstitutionIndexState(indexState, archivedVersion);
+            }
+            vufindInstanceManager.updateInstances(transformation.getSolrCore(), transformation.getInstitution());
+        } 
+        finally
         {
-            Files.deleteIfExists(transformationBean.getTransformationInput());
+            Files.deleteIfExists(transformation.getTransformationInput());
+            deleteProcessingFolder(transformation.getKey());
         }
     }
     
-    public void transform(TransformationBean transformationBean) throws IOException, TransformerException
+    protected void transform(Iterable<TransformationBean> transformations) throws IOException, TransformerException
+    {
+        for (TransformationBean transformation : transformations)
+        {
+            transform(transformation);
+        }
+    }
+    
+    protected void transform(TransformationBean transformationBean) throws IOException, TransformerException
     {
         final String key = transformationBean.getKey();
         Path path = idaInputArchiver.uncompressFile(
                 transformationBean.getTransformationInput(), 
-                processFileConfiguration.getFolder(ProcessStep.upload, key));
+                processFileConfiguration.getStepFolder(ProcessStep.upload, key));
 
         path = transformToWorkingFormat(path, transformationBean);
         
@@ -135,7 +149,7 @@ public class ProcessService
         final long start = System.currentTimeMillis();
         transformation.setTransformationWorkingFormatMessages("Processing...");
         
-        Path workingFormatFile = processFileConfiguration.getFolder(ProcessStep.workingFormat, transformation.getKey()).resolve(inputFile.getFileName());
+        Path workingFormatFile = processFileConfiguration.getStepFolder(ProcessStep.workingFormat, transformation.getKey()).resolve(inputFile.getFileName());
         Files.createDirectories(workingFormatFile.getParent());
        
         IdaTransformer transformationStrategy = institution.getTransformationStrategy();
@@ -167,7 +181,7 @@ public class ProcessService
         final long start = System.currentTimeMillis();
         transformation.setTransformationSolrFormatMessages("Processing...");
         
-        Path solrFormatFile = processFileConfiguration.getFolder(ProcessStep.solrFormat, transformation.getKey()).resolve(inputFile.getFileName());
+        Path solrFormatFile = processFileConfiguration.getStepFolder(ProcessStep.solrFormat, transformation.getKey()).resolve(inputFile.getFileName());
         Files.createDirectories(solrFormatFile.getParent());
 
         try 
@@ -190,12 +204,83 @@ public class ProcessService
         return solrFormatFile;
     }
     
-    public void deleteProcessingFolder(String key)
+    private void deleteProcessingFolder(String key)
     {
         final Path path = processFileConfiguration.getBasePath().resolve(key);
         log.debug("Delete processing folder: {} for transformation: {}", path, key);
         Directories.delete(path);
     }
 
+    /**
+     * Asynchronously re-processes a given upload version (up to a given incremental update) of an institution in a Solr core
+     * @param solrCore
+     * @param institution
+     * @param versionId
+     * @param upToUpdateId
+     * @return the bean of the enqueued re-process job
+     * @throws ArchiveException
+     */
+    public ReprocessJobBean reprocessVersionAsync(final SolrCore solrCore, final IdaInstitutionBean institution, 
+            final VersionKey version) throws ArchiveException
+    {
+        log.info("Start re-processing of version: {} for institution: {} on Solr core: {}", 
+                version, institution, solrCore.getName());
+        
+        ReprocessJobBean reprocessJobBean = new ReprocessJobBean(solrCore, institution, version);
+       
+        jobExecutionService.executeAsynchronous(reprocessJobBean, new JobCallable<ReprocessJobBean>()
+        {
+            @Override
+            public void call(ReprocessJobBean jobBean) throws Exception
+            {
+                List<TransformationBean> transformations =
+                        prepareTransformations(solrCore, institution, version, jobBean.getUser().getUsername());
+                jobBean.getTransformations().addAll(transformations);
+                reprocess(solrCore, institution, version, transformations);
+            }
+        });
+        
+        return reprocessJobBean;
+    }
+   
+    protected List<TransformationBean> prepareTransformations(SolrCore solrCore, IdaInstitutionBean institution, 
+            VersionKey targetVersion, String userName) throws ArchiveException 
+    {
+        BaseVersion baseVersion = archiveService.getArchive(institution).getBaseVersion(targetVersion);
+
+        List<TransformationBean> transformations = new ArrayList<>();
+        transformations.add(TransformationBean.fromBaseVersion(baseVersion, solrCore, userName));
+        transformations.addAll(Collections2.transform(
+                baseVersion.getUpdatesIn(1, targetVersion.getUpdateNumber()), 
+                updateVersion -> TransformationBean.fromUpdateVersion(updateVersion, solrCore, userName))
+        );
+           
+        return transformations;
+    }
     
+    protected void reprocess(SolrCore solrCore, IdaInstitutionBean institution, VersionKey targetVersion, 
+            List<TransformationBean> transformations) throws IOException, TransformerException, SolrServerException, ArchiveException
+    {
+        try
+        {
+            transform(transformations);
+            
+            InstitutionIndexState indexState = archiveService.getInstitutionIndexState(institution, solrCore);
+            synchronized (indexState)
+            {
+                solrUpdateService.updateSolr(transformations, true);
+
+                AbstractVersion lastArchivedVersion = archiveService.archive(transformations);
+                archiveService.updateInstitutionIndexState(indexState, lastArchivedVersion);
+            }
+            vufindInstanceManager.updateInstances(solrCore, institution);
+
+        } finally
+        {
+            for (TransformationBean transformation : transformations)
+            {
+                deleteProcessingFolder(transformation.getKey());
+            }
+        }
+    }
 }

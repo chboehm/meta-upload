@@ -1,19 +1,13 @@
 package de.idadachverband.transform.duplicate;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import javax.json.Json;
 import javax.json.JsonObject;
-import javax.json.JsonReader;
-
-import lombok.Cleanup;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +21,8 @@ import net.sf.saxon.value.SequenceType;
 import net.sf.saxon.value.StringValue;
 
 import org.apache.commons.codec.digest.DigestUtils;
+
+import de.idadachverband.utils.JsonHelper;
 
 
 @Slf4j
@@ -68,11 +64,7 @@ public class GroupIdBuilder
     public void loadNormalizers(Path normalizerConfigPath) throws IOException
     {
         if (!Files.exists(normalizerConfigPath)) return;
-        @Cleanup 
-        InputStream in = Files.newInputStream(normalizerConfigPath, StandardOpenOption.READ);
-        @Cleanup
-        JsonReader reader = Json.createReader(in);
-        JsonObject normalizerMap = reader.readObject();
+        JsonObject normalizerMap = JsonHelper.loadJsonFile(normalizerConfigPath);
         for (String normalizerName : normalizerMap.keySet()) 
         {
             FieldNormalizer.Builder builder = new FieldNormalizer.Builder();

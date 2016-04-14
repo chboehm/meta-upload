@@ -1,7 +1,7 @@
 package de.idadachverband.user;
 
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -19,7 +19,7 @@ public class IdaUser
      
     private final Set<IdaInstitutionBean> institutionsSet = new HashSet<IdaInstitutionBean>();
 
-    private final Set<SolrService> solrServiceSet = new HashSet<SolrService>();
+    private final Set<SolrCore> solrServiceSet = new HashSet<SolrCore>();
     
     private String email;
 

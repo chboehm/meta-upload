@@ -1,32 +1,28 @@
 package de.idadachverband.archive;
 
-import static de.idadachverband.archive.Directories.*;
-import de.idadachverband.archive.bean.ArchiveCoreBean;
-import de.idadachverband.archive.bean.ArchiveInstitutionBean;
-import de.idadachverband.archive.bean.ArchiveVersionBean;
-import de.idadachverband.archive.bean.ArchiveBaseVersionBean;
-import de.idadachverband.archive.bean.VersionOrigin;
+import static de.idadachverband.utils.Directories.*;
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.institution.IdaInstitutionConverter;
+import de.idadachverband.process.ProcessFileConfiguration;
 import de.idadachverband.process.ProcessStep;
+import de.idadachverband.solr.SolrCore;
 import de.idadachverband.transform.TransformationBean;
 import de.idadachverband.user.UserService;
-import lombok.Cleanup;
+import de.idadachverband.utils.Directories;
+import de.idadachverband.utils.JsonHelper;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by boehm on 25.02.15.
@@ -36,7 +32,8 @@ import java.util.Properties;
 public class ArchiveService
 {
     
-    public static final String VERSION_PROPERTIES = "version.properties";
+    public static final String VERSION_FILE = "version.json";
+    public static final String INSTITUTION_FILE = "institution.json";
     
     private final ArchiveConfiguration archiveConfiguration;
     
@@ -46,21 +43,20 @@ public class ArchiveService
     
     private final IdaInputArchiver idaInputArchiver;
     
-    private final IdaInstitutionConverter idaInstitutionConverter;
+    private final Map<IdaInstitutionBean, InstitutionArchive> institutionArchives;
     
     @Inject
     public ArchiveService(ArchiveConfiguration archiveConfiguration,
                           ProcessFileConfiguration processFileConfiguration,
                           SimpleDateFormat dateFormat,
                           IdaInputArchiver idaInputArchiver,
-                          IdaInstitutionConverter idaInstitutionConverter,
                           UserService userService)
     {
         this.archiveConfiguration = archiveConfiguration;
         this.processFileConfiguration = processFileConfiguration;
         this.dateFormat = dateFormat;
         this.idaInputArchiver = idaInputArchiver;
-        this.idaInstitutionConverter = idaInstitutionConverter;
+        this.institutionArchives = new ConcurrentHashMap<>();
     }
     
     /**
@@ -73,10 +69,10 @@ public class ArchiveService
      * @return
      * @throws ArchiveException
      */
-    public Path findFile(ProcessStep step, String coreName, String institutionId, VersionKey version) 
+    public Path findFile(ProcessStep step, String institutionId, VersionKey version) 
             throws ArchiveException
     {
-        Path folder = getStepFolder(step, coreName, institutionId, version);
+        Path folder = archiveConfiguration.getStepFolder(step, institutionId, version);
         try 
         {
             Path file = Directories.findFirstFile(folder);
@@ -84,366 +80,252 @@ public class ArchiveService
         } catch (IOException e)
         {
             log.error("Could not find an archived file in: {}", folder, e);
-            throw new ArchiveException(String.format("Could not find an archived file of step: %s for institution: %s version: %s on core: %s", 
-                    step, institutionId, version, coreName), e);
+            throw new ArchiveException(String.format("Could not find an archived file of step: %s for institution: %s version: %s", 
+                    step, institutionId, version), e);
         }
     }
     
     /* -------- archive transformations --------*/
     
+    
+    public AbstractVersion archive(Iterable<TransformationBean> transformations) throws IOException, ArchiveException
+    {
+        AbstractVersion lastArchivedVersion = null;
+        for (TransformationBean transformation : transformations)
+        {
+            lastArchivedVersion = archive(transformation);
+        }
+        return lastArchivedVersion;
+    }
+    
     /**
      * archives the step files of a given transformation
-     * @param transformationBean
+     * @param transformation
      * @throws IOException
      * @throws ArchiveException
      */
-    public ArchiveVersionBean archive(TransformationBean transformationBean, VersionOrigin origin, String username) throws IOException, ArchiveException
+    public AbstractVersion archive(TransformationBean transformation) throws IOException, ArchiveException
     {
-        final String key = transformationBean.getKey();
-        final String coreName = transformationBean.getCoreName();
-        final String institutionId = transformationBean.getInstitutionId();
-        final boolean incrementalUpdate = transformationBean.isIncrementalUpdate();
+        final String transformationKey = transformation.getKey();
+        final String institutionId = transformation.getInstitutionId();
         
-        VersionKey version = createNextVersionKey(coreName, institutionId, incrementalUpdate);
-        transformationBean.setArchivedVersion(version);
-        log.info("Archive transformation: {} for institution: {} using version: {}", key, institutionId, version);
+        InstitutionArchive institutionArchive = getArchive(transformation.getInstitution());
+        AbstractVersion version = institutionArchive.createNextVersion(transformation.getOrigin(), 
+                transformation.isIncrementalUpdate());                
+        
+        VersionKey versionKey = version.getVersionKey();
+        log.info("Archive transformation: {} for institution: {} using version: {}", transformationKey, institutionId, versionKey);
+        transformation.setArchivedVersion(versionKey);
 
-        ArchiveVersionBean versionBean = (incrementalUpdate)
-                ? new ArchiveVersionBean(version)
-                : new ArchiveBaseVersionBean(version);
+        version.setUploadFile(
+                archiveStep(ProcessStep.upload, transformationKey, institutionId, versionKey));
+        version.setWorkingFormatFile(
+                archiveStep(ProcessStep.workingFormat, transformationKey, institutionId,versionKey));
+        version.setSolrFormatFile(
+                archiveStep(ProcessStep.solrFormat, transformationKey, institutionId, versionKey));
         
-        versionBean.setUploadFile(
-                archive(ProcessStep.upload, key, institutionId, coreName, version));
-        versionBean.setWorkingFormatFile(
-                archive(ProcessStep.workingFormat, key, institutionId, coreName, version));
-        versionBean.setSolrFormatFile(
-                archive(ProcessStep.solrFormat, key, institutionId, coreName, version));
-        
-        versionBean.setUserName(username);
-        versionBean.setOrigin(origin);
-        versionBean.setOriginalVersion(transformationBean.getOriginalVersion());       
-        
-        storeVersionProperties(versionBean, coreName, institutionId, version);
+        storeVersionProperties(version);
 
-        clearOldVersions(coreName, institutionId);   
+        clearOldVersions(institutionArchive);   
         
-        return versionBean;
-    }
-    
-    /**
-     * pushes an archived version to the head of the archive by copying all files
-     * @param coreName
-     * @param institutionId
-     * @param originalVersion
-     * @param origin
-     * @return
-     * @throws ArchiveException 
-     * @throws IOException 
-     */
-    public ArchiveVersionBean rearchive(String coreName, String institutionId, 
-            VersionKey originalVersion, VersionOrigin origin, String username) throws ArchiveException, IOException
-    {
-        final boolean incrementalUpdate = !originalVersion.isBaseVersion();
-        
-        VersionKey version = createNextVersionKey(coreName, institutionId, incrementalUpdate);
-        ArchiveVersionBean versionBean = (incrementalUpdate)
-                ? new ArchiveVersionBean(version)
-                : new ArchiveBaseVersionBean(version);
-                
-        versionBean.setUploadFile(
-                archiveFile(
-                    findFile(ProcessStep.upload, coreName, institutionId, originalVersion),
-                    ProcessStep.upload, coreName, institutionId, version));
-                    
-        versionBean.setWorkingFormatFile(
-                archiveFile(
-                        findFile(ProcessStep.workingFormat, coreName, institutionId, originalVersion),
-                        ProcessStep.workingFormat, coreName, institutionId, version));
-        versionBean.setSolrFormatFile(
-                archiveFile(
-                        findFile(ProcessStep.solrFormat, coreName, institutionId, originalVersion),
-                        ProcessStep.solrFormat, coreName, institutionId, version));
-        
-        versionBean.setUserName(username);
-        versionBean.setOrigin(origin);
-        versionBean.setOriginalVersion(originalVersion);       
-        
-        storeVersionProperties(versionBean, coreName, institutionId, version);
-        
-        return versionBean;
+        return version;
     }
 
-    protected Path archive(ProcessStep step, String key, String institutionId, String coreName, VersionKey version) throws IOException
+    protected Path archiveStep(ProcessStep step, String key, String institutionId, VersionKey version) throws IOException
     {
-        final Path sourcePath = Directories.findFirstFile(processFileConfiguration.getFolder(step, key));
-
-        return archiveFile(sourcePath, step, coreName, institutionId, version);
-    }
-
-    private Path archiveFile(final Path sourcePath, ProcessStep step,
-            String coreName, String institutionId, VersionKey version)
-            throws IOException
-    {
-        final Path targetFolder = getStepFolder(step, coreName, institutionId, version);      
+        final Path sourcePath = Directories.findFirstFile(processFileConfiguration.getStepFolder(step, key));
+        final Path targetFolder = archiveConfiguration.getStepFolder(step, institutionId, version);      
         
-        return idaInputArchiver.archiveFile(sourcePath, targetFolder);
+        return idaInputArchiver.archiveFile(sourcePath, targetFolder, step.getName() + "-");
     }
-    
-    public void clearOldVersions(String coreName, String institutionId) 
+
+    protected void clearOldVersions(InstitutionArchive institutionArchive) 
     {
-        final List<String> baseIds = getBaseIds(coreName, institutionId);
-        for (int i=0; i < baseIds.size() - archiveConfiguration.getMaxArchivedVersions(); i++) 
+        synchronized (institutionArchive)
         {
-            final String baseId = baseIds.get(i);
-            log.info("Clear old version: {} of institution: {} in core: {}", baseId, institutionId, coreName);
-            delete(archiveConfiguration.getVersionFolder(coreName, institutionId, baseId));
+            while (institutionArchive.getBaseVersions().size() > archiveConfiguration.getMaxArchivedVersions())
+            {
+                VersionKey oldVersion = new VersionKey(institutionArchive.getOldestBaseNumber(), 0);
+                log.info("Clear old version: {} of institution: {}", oldVersion, institutionArchive);
+                institutionArchive.removeBaseVersion(oldVersion.getBaseNumber());
+                final Path versionFolder = archiveConfiguration.getVersionFolder(institutionArchive.getInstitutionId(), oldVersion);
+                delete(versionFolder);
+            }
         }
-    }
-    
-    
-    /* -------- version id handling --------*/
-    
-    public VersionKey getLatestVersionKey(String coreName, String institutionId) throws ArchiveException
-    {
-        final List<String> baseIds = getBaseIds(coreName, institutionId);
-        if (baseIds.isEmpty()) {
-            return VersionKey.NO_VERSION; 
-        }
-        String baseId = baseIds.get(baseIds.size()-1);
-        
-        final List<String> updateIds = getUpdateIds(coreName, institutionId, baseId);
-        if (updateIds.isEmpty())
-        {
-            return new VersionKey(baseId);
-        } else 
-        {
-            return new VersionKey(baseId, updateIds.get(updateIds.size()-1));
-        }
-    }
-    
-    public VersionKey createNextVersionKey(String coreName, String institutionId, boolean incremental) throws ArchiveException
-    {
-        VersionKey latestVersion = getLatestVersionKey(coreName, institutionId);
-        return (!incremental || latestVersion == VersionKey.NO_VERSION) 
-            ? new VersionKey(latestVersion.getBaseNumber() + 1, 0)
-            : new VersionKey(latestVersion.getBaseNumber(), latestVersion.getUpdateNumber() + 1);            
-    }
-    
-    /**
-     * @param coreName
-     * @param institutionId 
-     * @return a list of chronologically sorted version ids for the given institution
-     */
-    protected List<String> getBaseIds(String coreName, String institutionId) 
-    {
-    	final List<String> baseIds = listDirectoryNames(archiveConfiguration.getVersionsBasePath(coreName, institutionId));
-        Collections.sort(baseIds);
-        return baseIds;
-    }
-    
-    /**
-     * @param coreName
-     * @param institutionId 
-     * @param baseId
-     * @return a list of chronologically sorted incremental update ids for the given version
-     */
-    protected List<String> getUpdateIds(String coreName, String institutionId, String baseId) 
-    {
-        final List<String> updateIds;
-        Path updatesBasePath = archiveConfiguration.getUpdatesBasePath(coreName, institutionId, baseId);
-        if (Files.exists(updatesBasePath))
-        {
-            updateIds = listDirectoryNames(updatesBasePath);
-            Collections.sort(updateIds);
-        } else
-        {
-            updateIds = Collections.emptyList(); 
-        }        
-        return updateIds;
     }
     
     /* -------- delete archived files --------*/
     
-    public void deleteVersion(String coreName, String institutionId, VersionKey version) 
+    public void deleteVersion(IdaInstitutionBean institution, VersionKey versionKey) 
     {
-        final Path versionFolder = getVersionFolder(coreName, institutionId, version);
+        getArchive(institution).removeVersion(versionKey);
+        final Path versionFolder = archiveConfiguration.getVersionFolder(institution.getInstitutionId(), versionKey);
         delete(versionFolder);
     }
         
     /* -------- archive traversal --------*/
     
     /**
-     * lists all archived cores while traversing the whole archive 
-     * @return list of archived cores
-     * @throws ArchiveException 
-     */
-    public List<ArchiveCoreBean> getArchivedCores()
-    {
-        final List<ArchiveCoreBean> archivedCores = new ArrayList<>();
-        for (String coreName : getCoreNames())
-        {
-            log.debug("found core: {}", coreName);
-            archivedCores.add(buildCoreBean(coreName, true, true));
-        }
-        return archivedCores;
-    }
-    
-    /**
-     * lists all archived institutions of a core
-     * @param coreName
-     * @param traverseVersions
      * @return list of archived institutions
-     * @throws ArchiveException 
      */
-    public List<ArchiveInstitutionBean> getArchivedInstitutions(String coreName, boolean traverseVersions)
+    public List<InstitutionArchive> getArchives(Iterable<IdaInstitutionBean> institutions)
     {
-        // build parent core 
-        ArchiveCoreBean parent = buildCoreBean(coreName, true, traverseVersions);
-        
-        return parent.getInstitutions();
-    }
-    
-    /**
-     * gets an upload version from the archive (without traversing the rest of the archive)
-     * @param coreName
-     * @param institutionId
-     * @param baseId
-     * @return 
-     * @throws ArchiveException
-     */
-    public ArchiveBaseVersionBean getArchivedBaseVersion(String coreName, String institutionId, VersionKey versionKey) throws ArchiveException
-    {
-        return buildBaseVersionBean(coreName, institutionId, versionKey.getBaseId());
-    }
-    
-    protected ArchiveCoreBean buildCoreBean(String coreName, boolean traverseInstitutions, boolean traverseVersions)
-    {
-        ArchiveCoreBean bean = new ArchiveCoreBean(coreName);
-        
-        if (traverseInstitutions)
+        ArrayList<InstitutionArchive> institutionArchives = new ArrayList<>();
+        for (IdaInstitutionBean institution : institutions)
         {
-            for (String institutionId : getInstitutionIds(coreName))
+            try
             {
-                log.debug("found institution: {}", institutionId);
-                try
-                {
-                    ArchiveInstitutionBean archivedInstitution = buildInstitutionBean(coreName, institutionId, traverseVersions);
-                    bean.getInstitutions().add(archivedInstitution);
-                } catch (Exception e)
-                {
-                    log.warn("Could not read archived institution {} from core {}", institutionId, coreName, e);
-                }
+                institutionArchives.add(getArchive(institution));
+            } catch (Exception e)
+            {
+                log.warn("Could not load archived institution {}", institution, e);
             }
         }
-            
-        return bean;
+        return institutionArchives;
     }
     
-    protected ArchiveInstitutionBean buildInstitutionBean(String coreName, String institutionId, boolean traverseVersions) 
+    public synchronized InstitutionArchive getArchive(IdaInstitutionBean institution)
     {
-        IdaInstitutionBean institutionBean = idaInstitutionConverter.convert(institutionId);
-        ArchiveInstitutionBean bean = new ArchiveInstitutionBean(institutionBean);
-       
-        if (traverseVersions)
+        if (!institutionArchives.containsKey(institution))
         {
-            // read versions 
-            for (String baseId : getBaseIds(coreName, institutionId))
+            institutionArchives.put(institution, loadInstitutionArchive(institution));
+        }
+        return institutionArchives.get(institution);
+    }
+    
+    public VersionKey getIndexedVersionKey(IdaInstitutionBean institution, SolrCore solr)
+    {
+        return getArchive(institution).getIndexState(solr).getVersionKey();
+    }
+    
+    public InstitutionIndexState getInstitutionIndexState(IdaInstitutionBean institution, SolrCore solrCore)
+    {
+        return getArchive(institution).getIndexState(solrCore);
+    }
+    
+    public synchronized void updateInstitutionIndexState(InstitutionIndexState indexState, VersionKey indexedVersionKey, VersionInfo origin)
+    {
+        indexState.update(indexedVersionKey, origin);
+        storeInstitutionProperties(indexState.getInstitutionArchive());
+    }
+        
+    public void updateInstitutionIndexState(InstitutionIndexState indexState, AbstractVersion indexedVersion)
+    {
+        updateInstitutionIndexState(indexState, indexedVersion.getVersionKey(), indexedVersion.getOrigin());
+    }
+    
+    protected InstitutionArchive loadInstitutionArchive(IdaInstitutionBean institution) 
+    {
+        InstitutionArchive institutionArchive = new InstitutionArchive(institution);
+        loadInstitutionProperties(institutionArchive);
+       
+        for (String baseVersionId : getArchivedBaseVersionIds(institution.getInstitutionId()))
+        {
+            log.debug("found version: {}", baseVersionId);
+            try 
             {
-                log.debug("found version: {}", baseId);
-                try 
-                {
-                    bean.getBaseVersions().add(buildBaseVersionBean(coreName, institutionId, baseId));
-                } catch (Exception e)
-                {
-                    log.warn("Could not read archived version {} of institution {} from core {}", baseId, institutionId, coreName, e);
-                }
+                loadBaseVersion(institutionArchive, baseVersionId);
+            } catch (Exception e)
+            {
+                log.warn("Could not load archived version {} of institution {}", baseVersionId, institution, e);
             }
         }
        
-        return bean;
+        return institutionArchive;
     }
-    
-    protected ArchiveBaseVersionBean buildBaseVersionBean(String coreName, String institutionId, String baseId) throws ArchiveException 
-    {  
-        final VersionKey versionKey = new VersionKey(baseId);
-        final ArchiveBaseVersionBean baseVersionBean = new ArchiveBaseVersionBean(versionKey);
-        
-        loadVersionProperties(baseVersionBean, coreName, institutionId, versionKey);
-        
-        // read updates 
-        for (String updateId : getUpdateIds(coreName, institutionId, baseId))
-        {
-            log.debug("found update: {}", updateId);
-            final VersionKey updateVersionKey = new VersionKey(baseId, updateId);
-            final ArchiveVersionBean updateBean = new ArchiveVersionBean(updateVersionKey);
 
-            loadVersionProperties(updateBean, coreName, institutionId, updateVersionKey);
-            
-            baseVersionBean.getIncrementalUpdates().add(updateBean);
-        }
-        
-        return baseVersionBean;
-    }
-    
-    protected void loadVersionProperties(ArchiveVersionBean versionBean, String coreName,
-            String institutionId, VersionKey versionKey)
-            throws ArchiveException
+    private void loadInstitutionProperties(InstitutionArchive institutionArchive)
     {
         try
         {
-            Path folder = getVersionFolder(coreName, institutionId, versionKey);
-            Properties properties = new Properties();
-            @Cleanup 
-            InputStream in = Files.newInputStream(folder.resolve(VERSION_PROPERTIES)); 
-            properties.load(in);
-            versionBean.loadProperties(properties, dateFormat);
+            Path path = archiveConfiguration.getInstitutionFolder(institutionArchive.getInstitutionId()).resolve(INSTITUTION_FILE);
+            institutionArchive.readJson(JsonHelper.loadJsonFile(path), dateFormat);
         } 
         catch (Exception e)
         {
-            log.warn("Could not load version.properties for archived version {} of institution {} from core {}",
-                    versionKey, institutionId, coreName);
+            log.warn("Could not load institution properties for archived institution {}", institutionArchive.getInstitution());
+        }
+    }
+    
+    private void storeInstitutionProperties(InstitutionArchive institutionArchive)
+    {
+        Path path = archiveConfiguration.getInstitutionFolder(institutionArchive.getInstitutionId()).resolve(INSTITUTION_FILE);
+        try
+        {
+            JsonHelper.storeJsonFile(institutionArchive.writeJson(dateFormat), path);
+        } catch (IOException e)
+        {
+            log.error("Could not store properties for archived institution {}", institutionArchive, e);
+        }
+    }
+    
+    protected BaseVersion loadBaseVersion(InstitutionArchive institutionArchive, String baseId) throws ArchiveException 
+    {  
+        final VersionKey baseVersionKey = new VersionKey(baseId);
+        final BaseVersion baseVersionArchive = new BaseVersion(baseVersionKey, new VersionInfo(), institutionArchive);
+        loadVersionProperties(baseVersionArchive);
+        institutionArchive.addBaseVersion(baseVersionArchive);
+        
+        // load updates 
+        for (String updateId : getArchivedUpdateVersionIds(institutionArchive.getInstitutionId(), baseId))
+        {
+            log.debug("found update: {}", updateId);
+            final VersionKey updateVersionKey = new VersionKey(baseId, updateId);
+            final UpdateVersion updateVersionArchive = new UpdateVersion(updateVersionKey, new VersionInfo(), baseVersionArchive);
+            loadVersionProperties(updateVersionArchive);
+            baseVersionArchive.addUpdate(updateVersionArchive);
         }
         
-        versionBean.setUploadFile(
-                findFile(ProcessStep.upload, coreName, institutionId, versionKey));
-        versionBean.setWorkingFormatFile(
-                findFile(ProcessStep.workingFormat, coreName, institutionId, versionKey));
-        versionBean.setSolrFormatFile(
-                findFile(ProcessStep.solrFormat, coreName, institutionId, versionKey));
+        return baseVersionArchive;
     }
     
-    protected void storeVersionProperties(ArchiveVersionBean versionBean, String coreName, 
-            String institutionId, VersionKey versionKey) throws IOException
+    private void loadVersionProperties(AbstractVersion version) throws ArchiveException
     {
-        Path folder = getVersionFolder(coreName, institutionId, versionKey);
-        Properties properties = new Properties();
-        versionBean.storeProperties(properties, dateFormat);
-        @Cleanup 
-        OutputStream out = Files.newOutputStream(folder.resolve(VERSION_PROPERTIES));
-        properties.store(out, "");
+        final String institutionId = version.getInstitutionId();
+        final VersionKey versionKey = version.getVersionKey();
+        try
+        {
+            Path path = archiveConfiguration.getVersionFolder(institutionId, versionKey).resolve(VERSION_FILE);
+            version.readJson(JsonHelper.loadJsonFile(path), dateFormat);
+        } 
+        catch (Exception e)
+        {
+            log.warn("Could not load version properties for archived version {} of institution {}",
+                    versionKey, institutionId);
+        }
+        
+        version.setUploadFile(
+                findFile(ProcessStep.upload, institutionId, versionKey));
+        version.setWorkingFormatFile(
+                findFile(ProcessStep.workingFormat, institutionId, versionKey));
+        version.setSolrFormatFile(
+                findFile(ProcessStep.solrFormat, institutionId, versionKey));
     }
     
-    protected List<String> getCoreNames() {
-        return listDirectoryNames(archiveConfiguration.getBasePath());
-    }
-    
-    protected List<String> getInstitutionIds(String coreName)
+    private void storeVersionProperties(AbstractVersion version) throws IOException
     {
-        return listDirectoryNames(archiveConfiguration.getInstitutionsBasePath(coreName));
+        Path path = archiveConfiguration.getVersionFolder(version.getInstitutionId(), version.getVersionKey())
+                .resolve(VERSION_FILE);
+        JsonHelper.storeJsonFile(version.writeJson(dateFormat), path);
     }
     
-    private Path getVersionFolder(String coreName, String institutionId, VersionKey version)
+    protected List<String> getArchivedBaseVersionIds(String institutionId) 
     {
-        return (version.isBaseVersion())
-            ? archiveConfiguration.getVersionFolder(coreName, institutionId, version.getBaseId())
-            : archiveConfiguration.getUpdateFolder(coreName, institutionId, version.getBaseId(), version.getUpdateId());
+        return listDirectoryNames(archiveConfiguration.getInstitutionFolder(institutionId), true);
     }
     
-    private Path getStepFolder(ProcessStep step, String coreName, String institutionId, VersionKey version)
+    protected List<String> getArchivedUpdateVersionIds(String institutionId, String baseId) 
     {
-        return (version.isBaseVersion())
-            ? archiveConfiguration.getFolder(step, coreName, institutionId, version.getBaseId())
-            : archiveConfiguration.getIncrementalFolder(step, coreName, institutionId, version.getBaseId(), version.getUpdateId());
+        final List<String> updateIds;
+        Path updatesBasePath = archiveConfiguration.getUpdatesBasePath(institutionId, baseId);
+        if (Files.exists(updatesBasePath))
+        {
+            updateIds = listDirectoryNames(updatesBasePath, true);
+        } else
+        {
+            updateIds = Collections.emptyList(); 
+        }        
+        return updateIds;
     }
-}
+}    
 

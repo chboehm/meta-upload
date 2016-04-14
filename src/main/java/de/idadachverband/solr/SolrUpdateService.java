@@ -2,20 +2,21 @@ package de.idadachverband.solr;
 
 import de.idadachverband.archive.ArchiveException;
 import de.idadachverband.archive.ArchiveService;
+import de.idadachverband.archive.BaseVersion;
 import de.idadachverband.archive.IdaInputArchiver;
+import de.idadachverband.archive.InstitutionIndexState;
+import de.idadachverband.archive.InstitutionArchive;
+import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.archive.VersionKey;
-import de.idadachverband.archive.bean.ArchiveInstitutionBean;
-import de.idadachverband.archive.bean.ArchiveVersionBean;
-import de.idadachverband.archive.bean.ArchiveBaseVersionBean;
-import de.idadachverband.archive.bean.VersionOrigin;
-import de.idadachverband.hierarchy.HierarchyCacheDeleteMethod;
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.job.BatchJobBean;
 import de.idadachverband.job.JobCallable;
 import de.idadachverband.job.JobExecutionService;
+import de.idadachverband.vufind.VufindInstanceManager;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.solr.client.solrj.SolrServerException;
+
+import com.google.common.collect.Collections2;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -37,19 +38,19 @@ public class SolrUpdateService
     private final ArchiveService archiveService;
     private final IdaInputArchiver idaInputArchiver;
     private final JobExecutionService jobExecutionService;
-    private final HierarchyCacheDeleteMethod hierarchyCacheDeleteMethod;
+    private final VufindInstanceManager vufindInstanceManager;
     
     @Inject
     public SolrUpdateService(
             ArchiveService archiveService, 
             IdaInputArchiver idaInputArchiver, 
             JobExecutionService jobExecutionService,
-            HierarchyCacheDeleteMethod hierarchyCacheDeleteMethod)
+            VufindInstanceManager vufindInstanceManager)
     {
         this.archiveService = archiveService;
         this.idaInputArchiver = idaInputArchiver;
         this.jobExecutionService = jobExecutionService;
-        this.hierarchyCacheDeleteMethod = hierarchyCacheDeleteMethod;
+        this.vufindInstanceManager = vufindInstanceManager;
     }
     
     /**
@@ -59,12 +60,12 @@ public class SolrUpdateService
      * @return the bean of the enqueued re-process job
      * @throws FileNotFoundException
      */
-    public ReindexJobBean reindexInstitutionAsync(SolrService solr, IdaInstitutionBean institution) throws ArchiveException
+  /*  public ReindexJobBean reindexInstitutionAsync(SolrService solr, IdaInstitutionBean institution) throws ArchiveException
     {
         return reindexVersionAsync(solr, institution, 
-                archiveService.getLatestVersionKey(solr.getName(), institution.getInstitutionId()));
+                archiveService.getLatestVersionKey(institution.getInstitutionId()));
     }
-    
+  */  
     /**
      * Asynchronously re-indexes the latest upload of an institutions in a Solr core
      * @param solr
@@ -72,7 +73,7 @@ public class SolrUpdateService
      * @return the bean of the enqueued re-process job
      * @throws FileNotFoundException
      */
-    public ReindexJobBean reindexVersionAsync(final SolrService solr, final IdaInstitutionBean institution, 
+    public ReindexJobBean reindexVersionAsync(final SolrCore solr, final IdaInstitutionBean institution, 
             final VersionKey version) throws ArchiveException
     {
         log.info("Start re-indexing of version: {} for institution: {} on Solr core: {}", 
@@ -86,7 +87,7 @@ public class SolrUpdateService
             public void call(ReindexJobBean jobBean) throws Exception
             {
                 List<SolrUpdateBean> solrUpdates =
-                        reindex(solr, institution, version, jobBean.getUser().getUsername());
+                        reindex(solr, institution, version, jobBean.getUser().getUsername(), false);
                 jobBean.getSolrUpdates().addAll(solrUpdates);
             }
         });
@@ -95,107 +96,94 @@ public class SolrUpdateService
     }
     
     /**
-     * Synchronously re-indexes the latest upload of an institutions in a Solr core
-     * @param solr
-     * @param institution
-     * @return
-     * @throws IOException
-     * @throws SolrServerException
-     */
-    public String reindexInstitution(SolrService solr, IdaInstitutionBean institution) throws ArchiveException, SolrServerException, IOException
-    {
-        VersionKey latestVersion = archiveService.getLatestVersionKey(solr.getName(), institution.getInstitutionId());
-        if (latestVersion.isMissing())
-        {
-            log.warn("There is no archived version for institution: {} on Solr core: {}", institution.getInstitutionName(), solr.getName());
-            return "No archived version!";
-        }
-        
-        List<SolrUpdateBean> solrUpdates = reindex(solr, institution, 
-                latestVersion, "");
-        
-        StringBuilder sb = new StringBuilder();
-        for (SolrUpdateBean solrUpdate : solrUpdates)
-        {
-            solrUpdate.buildResultMessage(sb);
-        }        
-        return sb.toString();
-    }
-    
-    /**
      * Asynchronously re-indexes latest uploads of all institution in a Solr core 
-     * @param solr
+     * @param solrCore
      * @return batch job waiting for all re-index jobs (one job per institution)
      * @throws FileNotFoundException
      */
-    public BatchJobBean reindexCoreAsync(SolrService solr) throws ArchiveException
+/*    public BatchJobBean reindexCoreAsync(SolrService solr) throws ArchiveException
     {
         final String coreName = solr.getName();
         final BatchJobBean batchJob = new BatchJobBean();
         batchJob.setJobName(String.format("Re-index archived uploads for all institutions on %s", coreName));
         
-        for (ArchiveInstitutionBean archivedInstitution : archiveService.getArchivedInstitutions(coreName, false))
+        for (InstitutionArchive archivedInstitution : archiveService.getInstitutionArchives(false))
         {
             batchJob.addChildJob(reindexInstitutionAsync(solr, archivedInstitution.getInstitutionBean()));
         }
         jobExecutionService.executeBatchAsynchronous(batchJob);
         return batchJob;
-    }
+    }*/
 
-    protected List<SolrUpdateBean> reindex(SolrService solr, IdaInstitutionBean institution, VersionKey version, String username) throws IOException, SolrServerException, ArchiveException 
+    protected List<SolrUpdateBean> reindex(SolrCore solrCore, IdaInstitutionBean institution, VersionKey targetVersion, 
+                                           String username, boolean isRollback) throws IOException, SolrServerException, ArchiveException 
     {
-        final String coreName = solr.getName();
-        final String institutionId = institution.getInstitutionId();
-        
         // prepare Solr updates
         final List<SolrUpdateBean> solrUpdates = new ArrayList<>();
         
-        ArchiveBaseVersionBean baseVersionBean = archiveService.getArchivedBaseVersion(coreName, institutionId, version);
-        SolrUpdateBean baseSolrUpdate = new SolrUpdateBean(solr, institution, baseVersionBean.getSolrFormatFile(), false);
-        baseSolrUpdate.setOriginalVersion(baseVersionBean.getVersion());
-        solrUpdates.add(baseSolrUpdate);
+        InstitutionArchive institutionArchive = archiveService.getArchive(institution);
+        InstitutionIndexState indexState = institutionArchive.getIndexState(solrCore);
+        synchronized (indexState)
+        {
+            VersionKey indexedVersion = indexState.getVersionKey();
+            BaseVersion baseVersion = institutionArchive.getBaseVersion(targetVersion);
+            if (!isRollback && 
+                !indexedVersion.isMissing() && 
+                targetVersion.isIncrementalUpdateOf(indexedVersion))
+            {
+                solrUpdates.addAll(Collections2.transform(
+                        baseVersion.getUpdatesIn(indexedVersion.getUpdateNumber() + 1, targetVersion.getUpdateNumber()),
+                        updateVersion -> SolrUpdateBean.fromUpdateVersion(updateVersion, solrCore, username)));
+            }
+            else
+            {
+                // full re-indexing
+                solrUpdates.add(SolrUpdateBean.fromBaseVersion(baseVersion, solrCore, username));
+                solrUpdates.addAll(Collections2.transform(
+                        baseVersion.getUpdatesIn(1, targetVersion.getUpdateNumber()),
+                        updateVersion -> SolrUpdateBean.fromUpdateVersion(updateVersion, solrCore, username)));
+            }
        
-        for (ArchiveVersionBean updateBean : baseVersionBean.getUpdatesUpTo(version.getUpdateNumber()))
-        {
-            SolrUpdateBean incrementalSolrUpdate = 
-                    new SolrUpdateBean(solr, institution, updateBean.getSolrFormatFile(), true);
-            incrementalSolrUpdate.setOriginalVersion(updateBean.getVersion());
-            solrUpdates.add(incrementalSolrUpdate);
+            // execute updates
+            if (!solrUpdates.isEmpty())
+            {
+                updateSolr(solrUpdates, !isRollback);
+                
+                VersionInfo lastUpdateInfo = solrUpdates.get(solrUpdates.size() - 1).getOrigin();
+                archiveService.updateInstitutionIndexState(indexState, lastUpdateInfo.getOriginalVersion(), lastUpdateInfo);
+            }
         }
-   
-        // re-index
-        for (SolrUpdateBean solrUpdate : solrUpdates)
+        if (!isRollback)
         {
-            updateSolr(solrUpdate, false);
+            vufindInstanceManager.updateInstances(solrCore, institution);
         }
         
-        // re-archive if this was not the latest version
-        if (!version.equals(archiveService.getLatestVersionKey(coreName, institutionId)))
-        {
-            for (SolrUpdateBean solrUpdate : solrUpdates)
-            {
-                archiveService.rearchive(coreName, institutionId, solrUpdate.getOriginalVersion(), VersionOrigin.REINDEX, username);
-            }
-            archiveService.clearOldVersions(coreName, institutionId);
-        }
         return solrUpdates;
     }
     
-    public void updateSolr(SolrUpdateBean indexRequest, boolean rollbackOnError) throws IOException, SolrServerException, ArchiveException
+    public void updateSolr(Iterable<? extends SolrUpdateBean> solrUpdates, boolean rollbackOnError) throws IOException, SolrServerException, ArchiveException
     {
-        final SolrService solr = indexRequest.getSolrService();
-        final IdaInstitutionBean institution = indexRequest.getInstitution();
-       
-        Path inputFile = indexRequest.getSolrInput();
-        
-        log.info("Start Solr update of core: {} for: {} with file: {}", solr, institution, inputFile);
-        final long start = System.currentTimeMillis();
-        indexRequest.setSolrMessage("Updating...");
-        
-        if (!indexRequest.isIncrementalUpdate())
+        for (SolrUpdateBean solrUpdate : solrUpdates)
         {
-            log.info("Delete institution: {} on Solr core: {}", institution, solr.getName());
-            solr.deleteInstitution(institution.getInstitutionId());
+            updateSolr(solrUpdate, rollbackOnError);
+        }
+    }
+
+    public void updateSolr(SolrUpdateBean solrUpdate, boolean rollbackOnError) throws IOException, SolrServerException, ArchiveException
+    {
+        final SolrCore solrCore = solrUpdate.getSolrCore();
+        final IdaInstitutionBean institution = solrUpdate.getInstitution();
+       
+        Path inputFile = solrUpdate.getSolrInput();
+        
+        log.info("Start Solr update of core: {} for: {} with file: {}", solrCore, institution, inputFile);
+        final long start = System.currentTimeMillis();
+        solrUpdate.setSolrMessage("Updating...");
+        
+        if (!solrUpdate.isIncrementalUpdate())
+        {
+            log.info("Delete institution: {} on Solr core: {}", institution, solrCore.getName());
+            solrCore.deleteInstitution(institution.getInstitutionId());
         }
 
         boolean inputIsArchived = idaInputArchiver.inputIsZip(inputFile);
@@ -206,21 +194,21 @@ public class SolrUpdateService
         
         try
         {
-            String solrResult = solr.update(inputFile);
+            String solrResult = solrCore.update(inputFile);
             log.debug("Solr result {}", solrResult);
         } 
         catch (Exception e)
         {
             if (rollbackOnError) {
-                log.warn("Update of solr {} failed for institution {}. Start rollback.", solr, institution, e);
-                final String rollbackResult = reindexInstitution(solr, institution);
+                log.warn("Update of solr {} failed for institution {}. Start rollback.", solrCore, institution, e);
+                final String rollbackResult = rollbackInstitution(institution, solrCore);
                 log.info("Result of rollback is: {}", rollbackResult);
-                indexRequest.setSolrMessage(
+                solrUpdate.setSolrMessage(
                         String.format("Failure!\n%s\nSolr rollback: %s", e.getMessage(), rollbackResult));
             }
             else 
             {
-                indexRequest.setSolrMessage(
+                solrUpdate.setSolrMessage(
                         String.format("Failure!\n%s", e.getMessage()));
             }
             throw new SolrServerException("Invalid update", e);
@@ -231,11 +219,37 @@ public class SolrUpdateService
                 Files.deleteIfExists(inputFile);
             }
         }
-        hierarchyCacheDeleteMethod.deleteHierarchyCache(institution);
         
         final long end = System.currentTimeMillis();
         final long duration = (end - start) / 1000;
-        log.info("Solr update of core: {} for: {} with file: {} took: {} seconds.", solr, institution, inputFile, duration);
-        indexRequest.setSolrMessage(String.format("Finished in %d seconds.", duration));
+        log.info("Solr update of core: {} for: {} with file: {} took: {} seconds.", solrCore, institution, inputFile, duration);
+        solrUpdate.setSolrMessage(String.format("Finished in %d seconds.", duration));
+    }
+    
+    /**
+     * Re-indexes the last indexed version 
+     * @param institution
+     * @param solrCore
+     * @return
+     * @throws IOException
+     * @throws SolrServerException
+     */
+    protected String rollbackInstitution(IdaInstitutionBean institution, SolrCore solrCore) throws ArchiveException, SolrServerException, IOException
+    {
+        VersionKey indexedVersion = archiveService.getIndexedVersionKey(institution, solrCore);
+        if (indexedVersion.isMissing())
+        {
+            log.warn("Unknown indexed version for institution: {} on Solr core: {}", institution, solrCore);
+            return "No archived version!";
+        }
+        
+        List<SolrUpdateBean> solrUpdates = reindex(solrCore, institution, indexedVersion, "", true);
+        
+        StringBuilder sb = new StringBuilder();
+        for (SolrUpdateBean solrUpdate : solrUpdates)
+        {
+            solrUpdate.buildResultMessage(sb);
+        }        
+        return sb.toString();
     }
 }

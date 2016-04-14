@@ -2,6 +2,8 @@ package de.idadachverband.institution;
 
 import org.springframework.core.convert.converter.Converter;
 
+import com.google.common.collect.Maps;
+
 import javax.inject.Inject;
 import javax.inject.Named;
 
@@ -16,19 +18,15 @@ import lombok.Getter;
  * Created by boehm on 23.09.14.
  */
 @Named
-public class IdaInstitutionConverter implements Converter<String, IdaInstitutionBean>
+public class IdaInstitutionManager implements Converter<String, IdaInstitutionBean>
 {
     @Getter
     private Map<String, IdaInstitutionBean> institutionsMap;
  
     @Inject
-    public IdaInstitutionConverter(Set<IdaInstitutionBean> institutionsSet)
+    public IdaInstitutionManager(Set<IdaInstitutionBean> institutionsSet)
     {
-        this.institutionsMap = new HashMap<String, IdaInstitutionBean>(institutionsSet.size());
-        for (IdaInstitutionBean bean : institutionsSet) 
-        {
-            institutionsMap.put(bean.getInstitutionId(), bean);
-        }
+        this.institutionsMap = new HashMap<>(Maps.uniqueIndex(institutionsSet, institution -> institution.getInstitutionId()));
     }
     
     @Override

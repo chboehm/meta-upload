@@ -12,8 +12,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import de.idadachverband.archive.ArchiveException;
 import de.idadachverband.archive.VersionKey;
 import de.idadachverband.institution.IdaInstitutionBean;
-import de.idadachverband.job.BatchJobBean;
-
 import javax.inject.Inject;
 
 import java.nio.file.Path;
@@ -34,7 +32,7 @@ public class ReindexController
         this.solrUpdateService = solrUpdateService;
     }
 
-    @RequestMapping(value = "/reindex/{solrService}", method = RequestMethod.GET)
+/*    @RequestMapping(value = "/reindex/{solrService}", method = RequestMethod.GET)
     public String reindexCore(@PathVariable("solrService") SolrService solrService,
                               ModelMap map)
     {
@@ -58,7 +56,8 @@ public class ReindexController
 
         return "redirect:/solr/reindexing";
     }
-
+*/
+/*
     @RequestMapping(value = "/reindex/{solrService}/{institution}", method = RequestMethod.GET)
     public String reindexInstitution(
             @PathVariable("solrService") SolrService solrService,
@@ -86,10 +85,11 @@ public class ReindexController
 
         return "redirect:/solr/reindexing";
     }
+*/
     
     @RequestMapping(value = "/reindex/{solrService}/{institution}/{version:.+}", method = RequestMethod.GET)
     public String reindexVersion(
-            @PathVariable("solrService") SolrService solrService,
+            @PathVariable("solrService") SolrCore solrService,
             @PathVariable("institution") IdaInstitutionBean institution,
             @PathVariable("version") String version,
             ModelMap map)

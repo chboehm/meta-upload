@@ -47,7 +47,7 @@ public class ArchiveControllerIT extends AbstractIdaSpringTests
     {
         mockMvc.perform(get("/archive"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("archiveList"));
+                .andExpect(view().name("institutionArchiveList"));
 
     }
 }

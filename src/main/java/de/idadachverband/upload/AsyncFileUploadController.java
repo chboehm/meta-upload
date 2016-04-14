@@ -1,9 +1,10 @@
 package de.idadachverband.upload;
 
+import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.institution.IdaInstitutionBean;
 import de.idadachverband.process.ProcessJobBean;
 import de.idadachverband.process.ProcessService;
-import de.idadachverband.solr.SolrService;
+import de.idadachverband.solr.SolrCore;
 import de.idadachverband.user.AuthenticationNotFoundException;
 import de.idadachverband.user.IdaUser;
 import de.idadachverband.user.UserService;
@@ -49,7 +50,7 @@ public class AsyncFileUploadController
     private SimpleDateFormat dateFormat;
     
     @Inject
-    private SolrService defaultSolrUpdater;
+    private SolrCore defaultSolrUpdater;
 
     @RequestMapping(method = RequestMethod.GET)
     public ModelAndView prepareUploadForm() throws AuthenticationNotFoundException
@@ -59,7 +60,7 @@ public class AsyncFileUploadController
         
         List<IdaInstitutionBean> institutions = new ArrayList<IdaInstitutionBean>(user.getInstitutionsSet());
         Collections.sort(institutions, ToStringIgnoringCaseComparator.INSTANCE);
-        List<SolrService> solrServices = new ArrayList<SolrService>(user.getSolrServiceSet());
+        List<SolrCore> solrServices = new ArrayList<SolrCore>(user.getSolrServiceSet());
         Collections.sort(solrServices, ToStringIgnoringCaseComparator.INSTANCE);
    
         boolean allowIncremental = false;
@@ -70,12 +71,15 @@ public class AsyncFileUploadController
             incrementalDefault = (institution.isIncrementalUpdate()) ? true : incrementalDefault;
         }
         
+        UploadFormBean uploadFormBean = new UploadFormBean();
+        uploadFormBean.setUpdate(incrementalDefault);
+        
         mav.addObject("institutions", institutions);
         mav.addObject("solrServices", solrServices);
         mav.addObject("defaultSolrService", defaultSolrUpdater);
         mav.addObject("allowIncremental", allowIncremental);
         mav.addObject("incrementalDefault", incrementalDefault); 
-        mav.addObject("transformation", new UploadFormBean());
+        mav.addObject("transformation", uploadFormBean);
 
         return mav;
     }
@@ -105,26 +109,30 @@ public class AsyncFileUploadController
                 try
                 {
                     IdaInstitutionBean institution = uploadFormBean.getInstitution();
-                    SolrService solr = uploadFormBean.getSolr();
+                    SolrCore solr = uploadFormBean.getSolr();
                     if (!user.getSolrServiceSet().contains(solr) || !user.getInstitutionsSet().contains(institution))
                     {
                         throw new AccessDeniedException(solr.getName() + "/" + institution.getInstitutionId());
                     }
-                    if (uploadFormBean.isIncremental() && !institution.isIncrementalUpdateAllowed())
+                    if (uploadFormBean.isUpdate() && !institution.isIncrementalUpdateAllowed())
                     {
                         throw new IllegalArgumentException("Institution " + institution + " does not support incremental updates!");
                     }
 
+                    if (file.isEmpty())
+                    {
+                        throw new IllegalArgumentException("File is empty!");
+                    }
                     tmpPath = moveToTempFile(file, institution.getInstitutionId());
 
-                    ProcessJobBean jobBean = 
-                            processService.processAsync(tmpPath, institution, solr, file.getOriginalFilename(), uploadFormBean.isIncremental());
+                    ProcessJobBean jobBean = processService.processAsync(tmpPath, institution, solr, uploadFormBean.isUpdate(), 
+                            VersionInfo.ofUpload(user.getUsername(), file.getOriginalFilename()));
                     map.addAttribute("jobId", jobBean.getJobId());
 
                     return "redirect:result/success";
-                } catch (IOException e)
+                } catch (Exception e)
                 {
-                    log.warn("Transformation of file {} failed", file, e);
+                    log.warn("Upload of file {} failed", file, e);
                     map.addFlashAttribute("cause", e.getCause());
                     map.addFlashAttribute("message", e.getMessage());
                     map.addFlashAttribute("stacktrace", e.getStackTrace());

@@ -31,8 +31,8 @@
                 class="org.springframework.format.support.FormattingConversionServiceFactoryBean">
         <beans:property name="converters">
             <beans:set>
-                <beans:bean class="de.idadachverband.institution.IdaInstitutionConverter"/>
-                <beans:bean class="de.idadachverband.solr.IdaSolrConverter"/>
+                <beans:bean class="de.idadachverband.institution.IdaInstitutionManager"/>
+                <beans:bean class="de.idadachverband.solr.SolrCoreManager"/>
             </beans:set>
         </beans:property>
     </beans:bean>

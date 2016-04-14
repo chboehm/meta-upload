@@ -103,4 +103,9 @@ public class VersionKey implements Comparable<VersionKey>
                 ? versionDiff
                 : Integer.compare(this.updateNumber, o.updateNumber);
     }
+    
+    public boolean isIncrementalUpdateOf(VersionKey other)
+    {
+        return this.baseNumber == other.baseNumber && this.updateNumber > other.updateNumber;
+    }
 }
