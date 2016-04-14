@@ -17,18 +17,20 @@
         <ul class="jobs">
             <c:forEach var="job" items="${runningJobs}">
                 <li>(<fmt:formatDate value="${job.startTime}" type="both" dateStyle="short" timeStyle="short"/>) ${job.jobName}
-                	<span class="infoBubble" title="Started by '${job.user}', Job-ID: ${job.jobId}${newLine}${job.resultMessage}">i</span>
-                	<a href="cancel/${job.jobId}" class="btn">Cancel</a>
+                	<span class="infoBubble" title="Gestartet von '${job.user}', Job-ID: ${job.jobId}${newLine}${job.resultMessage}">i</span>
+                	<div class="options">
+                		<a href="cancel/${job.jobId}" class="btn">Abbrechen</a>
+                	</div>
                 </li>
             </c:forEach>
         </ul>
         <h1>Abgeschlossene Jobs</h1>
         <ul class="jobs">
             <c:forEach var="job" items="${stoppedJobs}">
-                <li>(<fmt:formatDate value="${job.startTime}" type="both" dateStyle="short" timeStyle="short"/> - <fmt:formatDate value="${job.endTime}" type="time" timeStyle="short"/>) ${job.jobName}: ${job.progressState} 
-                	<span class="infoBubble" title="Started by '${job.user}', Job-ID: ${job.jobId}${newLine}${job.resultMessage}${job.exception != null ? newLine.concat('Exception: ').concat(job.exception) : ''}">i</span>
+                <li>(<fmt:formatDate value="${job.startTime}" type="both" dateStyle="short" timeStyle="short"/> - <fmt:formatDate value="${job.endTime}" type="time" timeStyle="short"/>) ${job.jobName}: ${job.progressState.description} 
+                	<span class="infoBubble" title="Gestartet von '${job.user}', Job-ID: ${job.jobId}${newLine}${job.resultMessage}${job.exception != null ? newLine.concat('Exception: ').concat(job.exception) : ''}">i</span>
                 	<div class="options">
-                		<a href="delete/${job.jobId}" class="delete" title="Delete"></a>
+                		<a href="delete/${job.jobId}" class="delete" title="Löschen"></a>
                 	</div>
                 </li>
             </c:forEach>

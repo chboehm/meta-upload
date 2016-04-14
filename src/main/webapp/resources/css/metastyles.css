@@ -141,6 +141,7 @@ select {
   font-family: serif;
   font-weight: bold;
   text-align: center;
+  font-size: 16px;
   width: 18px;
   height: 18px;
   line-height: 18px; }
@@ -292,13 +293,15 @@ header {
   border-bottom: 1px solid #CCC;
   margin-bottom: 6px;
   padding-bottom: 6px; 
-  line-height: 50px; }
+  line-height: 50px;}
+  #page-archiveList .versionList > li .version-info {
+    display: inline-block;
+    width: 350px; }
   #page-archiveList .versionList > li .version {
     display: inline-block;
     min-width: 85px; }
-  #page-archiveList .versionList > li > .indexStates {
-    display: inline-block;
-    margin-left: 6px; }
+  #page-archiveList .versionList > li .indexStates {
+    display: block; }
   #page-archiveList .versionList > li:last-child {
     border: 0 none;
     margin-bottom: 0;
@@ -315,8 +318,17 @@ header {
 #page-jobs ul.jobs li {
   background-color: #d6d3de;
   padding: 5px 10px;
-  margin-bottom: 9px; }
+  margin-bottom: 9px;
+  overflow: auto; }
 
 #page-upload label.buttonDescription {
   margin-left: 10px;
   color: #b8b3c6; }
+  
+#page-upload .latest-uploads {
+  margin-top: 50px;
+  border-top: 1px solid #CCC;
+  padding-top: 10px; }
+  #page-upload .latest-uploads > ul > li {
+  	line-height: 2em; }
+

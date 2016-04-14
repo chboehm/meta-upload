@@ -5,7 +5,6 @@ import de.idadachverband.job.JobProgressService;
 import de.idadachverband.job.JobProgressState;
 import de.idadachverband.process.ProcessJobBean;
 import de.idadachverband.transform.TransformationBean;
-import de.idadachverband.vufind.VufindInstanceManager;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Controller;
@@ -33,14 +32,11 @@ import static de.idadachverband.job.JobProgressState.FAILURE;
 @Slf4j
 public class ResultStateController
 {
-//    @Inject
-//    private HashService hashService;
-
     @Inject
     private JobProgressService jobProgressService;
     
-    @Inject 
-    private VufindInstanceManager vufindInstanceManager;
+    @Inject
+    private IdaUrlHelper idaUrlHelper;
 
     @RequestMapping(value = "getResult", produces = "application/json")
     @ResponseBody
@@ -65,7 +61,7 @@ public class ResultStateController
                         transformation.getInstitutionId(), 
                         transformation.getArchivedVersion().toString());
                 result.add("path", path.toString());
-                result.add("instanceUrl", vufindInstanceManager.getInstancePublicUrl(transformation.getCoreName()));
+                result.add("instanceUrl", idaUrlHelper.getVufindInstanceUrl(transformation.getSolrCore().getName()));
             }
         }
         if (state == FAILURE)

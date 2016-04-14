@@ -6,6 +6,7 @@ import de.idadachverband.archive.BaseVersion;
 import de.idadachverband.archive.IdaInputArchiver;
 import de.idadachverband.archive.InstitutionIndexState;
 import de.idadachverband.archive.InstitutionArchive;
+import de.idadachverband.archive.UpdateVersion;
 import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.archive.VersionKey;
 import de.idadachverband.institution.IdaInstitutionBean;
@@ -133,15 +134,15 @@ public class SolrUpdateService
             {
                 solrUpdates.addAll(Collections2.transform(
                         baseVersion.getUpdatesIn(indexedVersion.getUpdateNumber() + 1, targetVersion.getUpdateNumber()),
-                        updateVersion -> SolrUpdateBean.fromUpdateVersion(updateVersion, solrCore, username)));
+                        updateVersion -> createSolrUpdateFromUpdateVersion(updateVersion, solrCore, username)));
             }
             else
             {
                 // full re-indexing
-                solrUpdates.add(SolrUpdateBean.fromBaseVersion(baseVersion, solrCore, username));
+                solrUpdates.add(createSolrUpdateFromBaseVersion(baseVersion, solrCore, username));
                 solrUpdates.addAll(Collections2.transform(
                         baseVersion.getUpdatesIn(1, targetVersion.getUpdateNumber()),
-                        updateVersion -> SolrUpdateBean.fromUpdateVersion(updateVersion, solrCore, username)));
+                        updateVersion -> createSolrUpdateFromUpdateVersion(updateVersion, solrCore, username)));
             }
        
             // execute updates
@@ -159,6 +160,22 @@ public class SolrUpdateService
         }
         
         return solrUpdates;
+    }
+    
+    private SolrUpdateBean createSolrUpdateFromUpdateVersion(UpdateVersion updateVersionArchive, SolrCore solrService, String userName)
+    {
+        return new SolrUpdateBean(solrService, updateVersionArchive.getInstitution(), 
+                updateVersionArchive.getSolrFormatFile(), 
+                VersionInfo.ofReindex(userName, updateVersionArchive.getVersionKey()), 
+                true);
+    }
+
+    private SolrUpdateBean createSolrUpdateFromBaseVersion(BaseVersion baseVersionArchive, SolrCore solrService, String userName)
+    {
+        return new SolrUpdateBean(solrService, baseVersionArchive.getInstitution(), 
+                baseVersionArchive.getSolrFormatFile(),
+                VersionInfo.ofReindex(userName, baseVersionArchive.getVersionKey()),
+                false);
     }
     
     public void updateSolr(Iterable<? extends SolrUpdateBean> solrUpdates, boolean rollbackOnError) throws IOException, SolrServerException, ArchiveException
@@ -243,7 +260,7 @@ public class SolrUpdateService
             return "No archived version!";
         }
         
-        List<SolrUpdateBean> solrUpdates = reindex(solrCore, institution, indexedVersion, "", true);
+        List<SolrUpdateBean> solrUpdates = reindex(solrCore, institution, indexedVersion, "ROLLBACK", true);
         
         StringBuilder sb = new StringBuilder();
         for (SolrUpdateBean solrUpdate : solrUpdates)

@@ -18,13 +18,13 @@
             <div style="display: none;"><sec:authorize access="hasAuthority('admin')"></div><div></sec:authorize>
                 <form:label path="solr">Solr Core</form:label>
                 <form:select path="solr">
-                	<c:forEach items="${solrServices}" var="solrService">
+                	<c:forEach items="${solrCores}" var="solrCore">
     					<c:choose>
-    						<c:when test="${solrService eq defaultSolrService}">
-	    						<form:option value="${solrService}" selected="selected"/>
+    						<c:when test="${solrCore eq defaultSolrCore}">
+	    						<form:option value="${solrCore}" selected="selected"/>
 	    					</c:when>
 	    					<c:otherwise>
-	    						<form:option value="${solrService}"/>
+	    						<form:option value="${solrCore}"/>
 	    					</c:otherwise>
 	    				</c:choose>
 					</c:forEach>
@@ -47,9 +47,25 @@
             </c:if>
             <div>
 	            <input type="submit" value="Senden" class="btn" />
-	            <label class="buttonDescription">Klicken sie auf Senden um die Datei hochzuladen!</label>
+	            <label class="buttonDescription">Klicken Sie auf Senden um die Datei hochzuladen!</label>
             </div>
         </form:form>
+        <c:if test="${not empty latestUploads}">
+	        <div class="latest-uploads">
+	        	<h2>Letzte Uploads <span class="infoBubble" title="Neue Uploads werden erst nach ihrer Verarbeitung sichtbar.">i</span></h2>
+	        	<ul>
+        		<c:forEach var="upload" items="${latestUploads}">
+        			<li>
+		        		<span><fmt:formatDate value="${upload.date}" type="both" dateStyle="short" timeStyle="short"/>: <em>${upload.uploadedFileName}</em></span>
+	        		    <span>von ${upload.userName}</span>
+	        		    <c:if test="${institutions.size() gt 1}">
+	        		    	<span>für ${upload.institution.institutionName}</span>
+	        		    </c:if>
+        			</li>
+        		</c:forEach>
+	        	</ul>
+	        </div>
+        </c:if>
     </div>
     <%@include file="footer.jspf" %>
 </body>

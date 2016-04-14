@@ -15,9 +15,15 @@
         <constructor-arg index="0" value="Meta"/>
         <constructor-arg index="1" value="${solr.url}"/>
     </bean>
+
+    <bean id="liveSolrCore" class="de.idadachverband.solr.SolrCore">
+        <constructor-arg index="0" value="Meta-Live"/>
+        <constructor-arg index="1" value="${solr.url}"/>
+    </bean>
     
     <util:set id="solrCoreSet" set-class="java.util.HashSet" value-type="de.idadachverband.solr.SolrCore">
         <ref bean="defaultSolrCore"/>
+        <ref bean="liveSolrCore"/>
     </util:set>
 
     <!-- Vufind -->

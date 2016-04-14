@@ -1,5 +1,7 @@
 package de.idadachverband.job;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.Future;
@@ -8,9 +10,15 @@ import java.util.concurrent.Future;
  * Created by boehm on 02.10.14.
  */
 @Slf4j
+@RequiredArgsConstructor
 public enum JobProgressState
 {
-    SUCCESS, NOTFOUND, PROCESSING, CANCELLED, FAILURE, NOTSTARTED;
+    SUCCESS("Erfolgreich"), NOTFOUND("Unbekannt"), PROCESSING("In Verarbeitung"), 
+    CANCELLED("Abgebrochen"), FAILURE("Fehlgeschlagen"), NOTSTARTED("In Wartestellung");
+
+    @Getter
+    private final String description;
+    
 
     /**
      * Get current state by key

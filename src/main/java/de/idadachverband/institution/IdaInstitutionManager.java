@@ -7,6 +7,7 @@ import com.google.common.collect.Maps;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -39,4 +40,10 @@ public class IdaInstitutionManager implements Converter<String, IdaInstitutionBe
         }
         return bean;
     }
+    
+    public Collection<IdaInstitutionBean> getAllInstitutions()
+    {
+        return institutionsMap.values();
+    }
+    
 }

@@ -1,12 +1,7 @@
 package de.idadachverband.archive;
 
 import java.nio.file.Path;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Collection;
-
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
 
 import de.idadachverband.institution.IdaInstitutionBean;
 import lombok.Data;
@@ -20,22 +15,13 @@ public class AbstractVersion
     @Delegate
     protected final VersionKey versionKey;
 
+    @Delegate
     protected final VersionInfo origin;
     
     protected final InstitutionArchive institutionArchive;
         
     private Path uploadFile, workingFormatFile, solrFormatFile;
     
-    
-    public JsonObjectBuilder writeJson(SimpleDateFormat dateFormat)
-    {
-        return origin.writeJson(dateFormat);
-    }
-    
-    public void readJson(JsonObject object, SimpleDateFormat dateFormat) throws ArchiveException, ParseException
-    {
-        origin.readJson(object, dateFormat);
-    } 
 
     public String getInstitutionId()
     {

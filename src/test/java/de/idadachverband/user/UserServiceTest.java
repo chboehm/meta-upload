@@ -9,7 +9,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import de.idadachverband.institution.IdaInstitutionBean;
+import de.idadachverband.institution.IdaInstitutionManager;
 import de.idadachverband.solr.SolrCore;
+import de.idadachverband.solr.SolrCoreManager;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,7 +46,10 @@ public class UserServiceTest
         when(solrService.getName()).thenReturn("core");
         when(institution.getInstitutionId()).thenReturn("institution");
         
-        cut = Mockito.spy(new UserService(Collections.singleton(institution), Collections.singleton(solrService), solrService));       
+        cut = Mockito.spy(new UserService(
+                new IdaInstitutionManager(Collections.singleton(institution)), 
+                new SolrCoreManager(Collections.singleton(solrService)), 
+                solrService));       
         
         Collection<SimpleGrantedAuthority> authorities = new ArrayList<>();
 
@@ -96,7 +101,7 @@ public class UserServiceTest
     @Test 
     void getSolrServiceSet()
     {
-        final Set<SolrCore> actual = cut.getUser().getSolrServiceSet();
+        final Set<SolrCore> actual = cut.getUser().getSolrCores();
         
         assertThat(actual, equalTo(Collections.singleton(solrService)));
     }

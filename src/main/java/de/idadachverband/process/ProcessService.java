@@ -7,6 +7,7 @@ import de.idadachverband.archive.BaseVersion;
 import de.idadachverband.archive.IdaInputArchiver;
 import de.idadachverband.archive.InstitutionIndexState;
 import de.idadachverband.archive.InstitutionArchive;
+import de.idadachverband.archive.UpdateVersion;
 import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.archive.VersionKey;
 import de.idadachverband.institution.IdaInstitutionBean;
@@ -76,13 +77,13 @@ public class ProcessService
         this.vufindInstanceManager = vufindInstanceManager;
     }
 
-    public ProcessJobBean processAsync(final Path input, final IdaInstitutionBean institution, final SolrCore solr, boolean incrementalUpdate, VersionInfo origin) throws IOException
+    public ProcessJobBean processAsync(final Path input, final IdaInstitutionBean institution, final SolrCore solrCore, boolean incrementalUpdate, VersionInfo origin) throws IOException
     {
-        log.info("Start processing of: {} for institution: {} on Solr core: {}", origin.getUploadedFileName(), institution, solr);
+        log.info("Start processing of: {} for institution: {} on Solr core: {}", origin.getUploadedFileName(), institution, solrCore);
         final ProcessJobBean processJobBean = new ProcessJobBean(
-                new TransformationBean(solr, institution, input, origin, incrementalUpdate));
-        processJobBean.setJobName(String.format("Process file %s for %s, %s", 
-                origin.getUploadedFileName(), solr.getName(), institution.getInstitutionName()));
+                new TransformationBean(solrCore, institution, input, origin, incrementalUpdate));
+        processJobBean.setJobName(String.format("Verarbeitung des Uploads von %s nach %s", 
+                institution.getInstitutionName(), solrCore.getName()));
         
         jobExecutionService.executeAsynchronous(processJobBean, new JobCallable<ProcessJobBean>()
         {
@@ -249,13 +250,29 @@ public class ProcessService
         BaseVersion baseVersion = archiveService.getArchive(institution).getBaseVersion(targetVersion);
 
         List<TransformationBean> transformations = new ArrayList<>();
-        transformations.add(TransformationBean.fromBaseVersion(baseVersion, solrCore, userName));
+        transformations.add(createTransformationFromBaseVersion(baseVersion, solrCore, userName));
         transformations.addAll(Collections2.transform(
                 baseVersion.getUpdatesIn(1, targetVersion.getUpdateNumber()), 
-                updateVersion -> TransformationBean.fromUpdateVersion(updateVersion, solrCore, userName))
+                updateVersion -> createTransformationFromUpdateVersion(updateVersion, solrCore, userName))
         );
            
         return transformations;
+    }
+    
+    private TransformationBean createTransformationFromBaseVersion(BaseVersion baseVersion, SolrCore solrCore, String userName)
+    {
+        return new TransformationBean(solrCore, baseVersion.getInstitution(), 
+                baseVersion.getUploadFile(), 
+                VersionInfo.ofReprocess(userName, baseVersion.getVersionKey()),
+                false);
+    }
+    
+    private TransformationBean createTransformationFromUpdateVersion(UpdateVersion updateVersion, SolrCore solrCore, String userName)
+    {
+        return new TransformationBean(solrCore, updateVersion.getInstitution(), 
+                updateVersion.getUploadFile(), 
+                VersionInfo.ofReprocess(userName, updateVersion.getVersionKey()),
+                true);
     }
     
     protected void reprocess(SolrCore solrCore, IdaInstitutionBean institution, VersionKey targetVersion, 

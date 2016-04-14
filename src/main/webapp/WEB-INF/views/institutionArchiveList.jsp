@@ -27,8 +27,8 @@
                 	<c:set var="latestVersion" value="${institution.latestVersion}"/>
                 	<c:if test="${latestVersion != null}">
                 		<div class=latest>
-                			<span>Letzte Version: ${latestVersion.versionKey} (<fmt:formatDate value="${latestVersion.origin.date}" type="both" dateStyle="short" timeStyle="short"/>)</span>
-	                		<span class="infoBubble" title="${latestVersion.origin.description}">i</span>
+                			<span>Letzte Version: ${latestVersion.versionKey} (<fmt:formatDate value="${latestVersion.date}" type="both" dateStyle="short" timeStyle="short"/>)</span>
+	                		<span class="infoBubble" title="${latestVersion.description}">i</span>
                 		</div>
                 	</c:if>
                 </li>

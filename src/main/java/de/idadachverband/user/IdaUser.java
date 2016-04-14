@@ -19,7 +19,7 @@ public class IdaUser
      
     private final Set<IdaInstitutionBean> institutionsSet = new HashSet<IdaInstitutionBean>();
 
-    private final Set<SolrCore> solrServiceSet = new HashSet<SolrCore>();
+    private final Set<SolrCore> solrCores = new HashSet<SolrCore>();
     
     private String email;
 

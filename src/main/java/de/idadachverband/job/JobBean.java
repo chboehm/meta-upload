@@ -46,6 +46,12 @@ public class JobBean
     {
     }
     
+    public boolean isFailure()
+    {
+        JobProgressState state = getProgressState();
+        return state == JobProgressState.FAILURE || state == JobProgressState.CANCELLED;
+    }
+    
     public String toString()
     {
         return jobName;

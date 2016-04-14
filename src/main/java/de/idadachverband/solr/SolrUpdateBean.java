@@ -3,8 +3,6 @@ package de.idadachverband.solr;
 import java.nio.file.Path;
 import java.util.UUID;
 
-import de.idadachverband.archive.BaseVersion;
-import de.idadachverband.archive.UpdateVersion;
 import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.institution.IdaInstitutionBean;
 import lombok.Data;
@@ -63,21 +61,5 @@ public class SolrUpdateBean
             sb.append(solrMessage);
             sb.append('\n');
         }
-    }
-    
-    public static SolrUpdateBean fromUpdateVersion(UpdateVersion updateVersionArchive, SolrCore solrService, String userName)
-    {
-        return new SolrUpdateBean(solrService, updateVersionArchive.getInstitution(), 
-                updateVersionArchive.getSolrFormatFile(), 
-                VersionInfo.ofReindex(userName, updateVersionArchive.getVersionKey()), 
-                true);
-    }
-
-    public static SolrUpdateBean fromBaseVersion(BaseVersion baseVersionArchive, SolrCore solrService, String userName)
-    {
-        return new SolrUpdateBean(solrService, baseVersionArchive.getInstitution(), 
-                baseVersionArchive.getSolrFormatFile(),
-                VersionInfo.ofReindex(userName, baseVersionArchive.getVersionKey()),
-                false);
     }
 }

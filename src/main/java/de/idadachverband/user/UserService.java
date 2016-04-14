@@ -9,14 +9,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import de.idadachverband.institution.IdaInstitutionBean;
+import de.idadachverband.institution.IdaInstitutionManager;
 import de.idadachverband.solr.SolrCore;
+import de.idadachverband.solr.SolrCoreManager;
 
 import javax.inject.Inject;
 import javax.inject.Named;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Utility class to get UserDetails
@@ -28,30 +26,23 @@ public class UserService
 {
     public static final String ADMIN_ROLE = "admin"; 
      
-    private Map<String, IdaInstitutionBean> institutionsMap;
+    private IdaInstitutionManager institutionManager;
     
-    private Map<String, SolrCore> solrServiceMap;
-
-    private SolrCore defaultSolrUpdater;
+    private SolrCoreManager solrCoreManager;
+    
+    private SolrCore defaultSolrCore;
 
     @Value("${result.mail.from}")
     private String mailFrom;
     
     @Inject
-    public UserService(Set<IdaInstitutionBean> institutionsSet,
-            Set<SolrCore> solrServiceSet, SolrCore defaultSolrUpdater)
+    public UserService(IdaInstitutionManager institutionManager, 
+            SolrCoreManager solrCoreManager, 
+            SolrCore defaultSolrCore)
     {
-        this.institutionsMap = new HashMap<String, IdaInstitutionBean>(institutionsSet.size());
-        for (IdaInstitutionBean institution : institutionsSet) 
-        {
-            institutionsMap.put(institution.getInstitutionId(), institution);
-        }
-        this.solrServiceMap = new HashMap<String, SolrCore>(solrServiceSet.size());
-        for (SolrCore solrService : solrServiceSet) 
-        {
-            solrServiceMap.put(solrService.getName(), solrService);
-        }
-        this.defaultSolrUpdater = defaultSolrUpdater;
+        this.institutionManager = institutionManager;
+        this.solrCoreManager = solrCoreManager;
+        this.defaultSolrCore = defaultSolrCore;
     }
 
     public IdaUser getUser()
@@ -65,8 +56,8 @@ public class UserService
             if (userDetail.equals(ADMIN_ROLE))
             {
                 user.setAdmin(true);
-                user.getInstitutionsSet().addAll(institutionsMap.values());
-                user.getSolrServiceSet().addAll(solrServiceMap.values());
+                user.getInstitutionsSet().addAll(institutionManager.getAllInstitutions());
+                user.getSolrCores().addAll(solrCoreManager.getAllSolrCores());
             }
             else if (userDetail.contains("@"))
             {
@@ -76,11 +67,11 @@ public class UserService
             else if (userDetail.startsWith("#"))
             {
                 String coreName = userDetail.substring(1);
-                SolrCore solrService = solrServiceMap.get(coreName);
+                SolrCore solrService = solrCoreManager.convert(coreName);
                 if (solrService != null)
                 {
                     log.debug("Found solr service {} for user {}", solrService, user);
-                    user.getSolrServiceSet().add(solrService);
+                    user.getSolrCores().add(solrService);
                 } else
                 {
                     log.warn("Invalid solr core: {} in user roles.", coreName);
@@ -88,7 +79,7 @@ public class UserService
             }
             else
             {
-                IdaInstitutionBean institution = institutionsMap.get(userDetail);
+                IdaInstitutionBean institution = institutionManager.convert(userDetail);
                 if (institution != null)
                 {
                     log.debug("Found institution {} for user {}", institution, user);
@@ -105,10 +96,10 @@ public class UserService
             user.setEmail(mailFrom);
             log.warn("Did not find email for user {}", user);
         }
-        if (user.getSolrServiceSet().isEmpty())
+        if (user.getSolrCores().isEmpty())
         {
-            user.getSolrServiceSet().add(defaultSolrUpdater);
-            log.debug("Set default solr service {} for user {}", defaultSolrUpdater, user);
+            user.getSolrCores().add(defaultSolrCore);
+            log.debug("Set default solr service {} for user {}", defaultSolrCore, user);
         }
         
         return user;

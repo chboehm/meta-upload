@@ -1,5 +1,7 @@
 package de.idadachverband.upload;
 
+import de.idadachverband.archive.AbstractVersion;
+import de.idadachverband.archive.ArchiveService;
 import de.idadachverband.archive.VersionInfo;
 import de.idadachverband.institution.IdaInstitutionBean;
 import de.idadachverband.process.ProcessJobBean;
@@ -45,12 +47,15 @@ public class AsyncFileUploadController
     
     @Inject
     private ProcessService processService;
+    
+    @Inject 
+    private ArchiveService archiveService;
 
     @Inject
     private SimpleDateFormat dateFormat;
     
     @Inject
-    private SolrCore defaultSolrUpdater;
+    private SolrCore defaultSolrCore;
 
     @RequestMapping(method = RequestMethod.GET)
     public ModelAndView prepareUploadForm() throws AuthenticationNotFoundException
@@ -60,8 +65,8 @@ public class AsyncFileUploadController
         
         List<IdaInstitutionBean> institutions = new ArrayList<IdaInstitutionBean>(user.getInstitutionsSet());
         Collections.sort(institutions, ToStringIgnoringCaseComparator.INSTANCE);
-        List<SolrCore> solrServices = new ArrayList<SolrCore>(user.getSolrServiceSet());
-        Collections.sort(solrServices, ToStringIgnoringCaseComparator.INSTANCE);
+        List<SolrCore> solrCores = new ArrayList<SolrCore>(user.getSolrCores());
+        Collections.sort(solrCores, ToStringIgnoringCaseComparator.INSTANCE);
    
         boolean allowIncremental = false;
         boolean incrementalDefault = false;
@@ -70,15 +75,17 @@ public class AsyncFileUploadController
             allowIncremental = (institution.isIncrementalUpdateAllowed()) ? true : allowIncremental;
             incrementalDefault = (institution.isIncrementalUpdate()) ? true : incrementalDefault;
         }
-        
         UploadFormBean uploadFormBean = new UploadFormBean();
         uploadFormBean.setUpdate(incrementalDefault);
         
+        List<AbstractVersion> latestUploadVersions = archiveService.getLatestUploadVersions(institutions, 4);
+        
         mav.addObject("institutions", institutions);
-        mav.addObject("solrServices", solrServices);
-        mav.addObject("defaultSolrService", defaultSolrUpdater);
+        mav.addObject("solrCores", solrCores);
+        mav.addObject("defaultSolrCore", defaultSolrCore);
         mav.addObject("allowIncremental", allowIncremental);
         mav.addObject("incrementalDefault", incrementalDefault); 
+        mav.addObject("latestUploads", latestUploadVersions);
         mav.addObject("transformation", uploadFormBean);
 
         return mav;
@@ -110,7 +117,7 @@ public class AsyncFileUploadController
                 {
                     IdaInstitutionBean institution = uploadFormBean.getInstitution();
                     SolrCore solr = uploadFormBean.getSolr();
-                    if (!user.getSolrServiceSet().contains(solr) || !user.getInstitutionsSet().contains(institution))
+                    if (!user.getSolrCores().contains(solr) || !user.getInstitutionsSet().contains(institution))
                     {
                         throw new AccessDeniedException(solr.getName() + "/" + institution.getInstitutionId());
                     }

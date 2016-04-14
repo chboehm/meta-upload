@@ -1,6 +1,7 @@
 package de.idadachverband.archive;
 
 import static de.idadachverband.utils.Directories.*;
+import de.idadachverband.archive.VersionInfo.Action;
 import de.idadachverband.institution.IdaInstitutionBean;
 import de.idadachverband.process.ProcessFileConfiguration;
 import de.idadachverband.process.ProcessStep;
@@ -13,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+
+import com.google.common.collect.Collections2;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -193,14 +196,29 @@ public class ArchiveService
         return institutionArchives.get(institution);
     }
     
-    public VersionKey getIndexedVersionKey(IdaInstitutionBean institution, SolrCore solr)
+    public List<AbstractVersion> getLatestUploadVersions(Iterable<IdaInstitutionBean> institutions, int maxNumVersions)
     {
-        return getArchive(institution).getIndexState(solr).getVersionKey();
+        ArrayList<AbstractVersion> allUploadVersions = new ArrayList<>();
+        for (IdaInstitutionBean institution : institutions)
+        {
+            List<AbstractVersion> allInstitutionVersions = getArchive(institution).getAllVersions();
+            allUploadVersions.addAll(Collections2.filter(allInstitutionVersions, 
+                    version -> version.getAction() == Action.UPLOAD));
+        }
+        Collections.sort(allUploadVersions, 
+                (version1, version2) -> version2.getDate().compareTo(version1.getDate()));
+        
+        return allUploadVersions.subList(0, Math.min(maxNumVersions, allUploadVersions.size())); 
     }
     
     public InstitutionIndexState getInstitutionIndexState(IdaInstitutionBean institution, SolrCore solrCore)
     {
         return getArchive(institution).getIndexState(solrCore);
+    }
+    
+    public VersionKey getIndexedVersionKey(IdaInstitutionBean institution, SolrCore solrCore)
+    {
+        return getInstitutionIndexState(institution, solrCore).getVersionKey();
     }
     
     public synchronized void updateInstitutionIndexState(InstitutionIndexState indexState, VersionKey indexedVersionKey, VersionInfo origin)

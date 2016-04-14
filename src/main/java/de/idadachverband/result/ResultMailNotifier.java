@@ -1,8 +1,8 @@
 package de.idadachverband.result;
 
 import de.idadachverband.job.JobBean;
+import de.idadachverband.job.JobProgressState;
 import de.idadachverband.user.IdaUser;
-import de.idadachverband.user.UserService;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 import lombok.extern.slf4j.Slf4j;
@@ -28,49 +28,56 @@ import java.util.Map;
 @Slf4j
 public class ResultMailNotifier implements ResultNotifier
 {
-
     private final MailSender mailSender;
 
     private final Configuration freemarkerMailConfiguration;
+    
+    private final IdaUrlHelper idaUrlHelper;
 
     @Value("${result.mail.from}")
     private String mailFrom;
+    @Value("${result.mail.admin}")
+    private String mailAdmin;
     @Value("${result.mail.subject}")
     private String subject;
 
     @Inject
-    public ResultMailNotifier(MailSender mailSender, Configuration freemarkerMailConfiguration)
+    public ResultMailNotifier(MailSender mailSender, Configuration freemarkerMailConfiguration, IdaUrlHelper idaUrlHelper)
     {
         this.mailSender = mailSender;
         this.freemarkerMailConfiguration = freemarkerMailConfiguration;
+        this.idaUrlHelper = idaUrlHelper;
     }
 
     public void notify(JobBean jobBean) throws NotificationException
-    {
-        String result = "";
-        switch (jobBean.getProgressState()) 
-        {
-            case FAILURE: 
-                result = "Failure";
-                break;
-            case CANCELLED:
-                result = "Cancelled";
-                break;
-            default:
-                result = "Success";    
-        }
-        
+    {      
         IdaUser user = jobBean.getUser();
+        if (!user.isAdmin())
+        {
+            sendMail(jobBean, "Admin", mailAdmin, true);
+        }
+        sendMail(jobBean, user.getUsername(), user.getEmail(), user.isAdmin());
+    }
+
+    private void sendMail(JobBean jobBean, String userName, String eMail, boolean isAdmin)
+            throws NotificationException
+    {
+        String result = !jobBean.isFailure() ? 
+                JobProgressState.SUCCESS.getDescription() : 
+                jobBean.getProgressState().getDescription(); 
+        
         SimpleMailMessage email = new SimpleMailMessage();
-        email.setTo(user.getEmail());
-        email.setSubject(subject + " (" + result + ")");
+        email.setTo(eMail);
+        email.setSubject(subject + " - " + result + ": " + jobBean.getJobName());
         email.setFrom(mailFrom);
 
         Map<String, Object> model = new HashMap<>();
-        model.put("user", user.getUsername());
-        model.put("t", jobBean);
+        model.put("user", userName);
+        model.put("admin", isAdmin);
+        model.put("job", jobBean);
         model.put("result", result);
         model.put("message", jobBean.getResultMessage());
+        model.put("urlHelper", idaUrlHelper);
 
         try
         {

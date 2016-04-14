@@ -23,8 +23,8 @@ public class ReprocessJobBean extends JobBean
     public ReprocessJobBean(SolrCore solrService,
             IdaInstitutionBean institution, VersionKey version)
     {
-        setJobName(String.format("Re-process archived upload version %s for %s, %s", 
-                version, solrService.getName(), institution.getInstitutionName()));
+        setJobName(String.format("Neu-Verarbeitung der Version %s von %s nach %s", 
+                version, institution.getInstitutionName(), solrService.getName()));
         this.solrService = solrService;
         this.institution = institution;
         this.version = version;

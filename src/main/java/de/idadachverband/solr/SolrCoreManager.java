@@ -7,6 +7,7 @@ import com.google.common.collect.Maps;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -33,5 +34,10 @@ public class SolrCoreManager implements Converter<String, SolrCore>
         if (!coreMap.containsKey(name))
             throw new IllegalArgumentException("Did not find solr core with name " + name);
         return coreMap.get(name);
+    }
+    
+    public Collection<SolrCore> getAllSolrCores()
+    {
+        return coreMap.values();
     }
 }

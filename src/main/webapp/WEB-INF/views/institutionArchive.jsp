@@ -13,6 +13,10 @@
 	<%@include file="menu.jspf" %>
     <div class="main" id="page-archiveList">
         <h1>Archiv: ${institution.institutionName}</h1>
+        <c:set var="versions" value="${institution.allVersionsDescending}"/>
+        <c:if test="${empty versions}">
+        	<p>Keine Versionen archiviert.</p>
+        </c:if>
         <ul class="versionList">
             <spring:url value="/solr/reindex" var="reindexLink"/>
             <spring:url value="/process/reprocess" var="reprocessLink"/>
@@ -21,29 +25,12 @@
             <spring:url value="/files/solrFormat" var="solrLink"/>
             <spring:url value="/archive/delete" var="deleteLink"/>
             <spring:url value="/archive" var="archiveLink"/>
-            
-            <c:set var="versions" value="${institution.allVersionsDescending}"/>
-            <c:if test="${empty versions}">
-            	<p>Keine Versionen archiviert.</p>
-            </c:if>
             <c:forEach var="version" items="${versions}">
                 <li>
-                	<span class="version" data-is-base-version="${version.baseVersion}">Version ${version.versionKey}</span>
-                	<span>(<fmt:formatDate value="${version.origin.date}" type="both" dateStyle="short" timeStyle="short"/>)</span>
-                	<span class="infoBubble" title="${version.origin.description}">i</span>
-                	
-                	<c:set var="indexStates" value="${version.indexStates}"/>
-                	<c:if test="${not empty indexStates}">
-                		<div class="indexStates">
-                			<span>auf</span>
-                			<c:forEach var="indexState" items="${indexStates}">
-	                			<span>${indexState.coreName}
-	                				<span class="infoBubble" title="${indexState.origin.description}">i</span>
-	                			</span>
-	                		</c:forEach>
-                		</div>
-                	</c:if>
-                	
+               		<span class="version" data-is-base-version="${version.baseVersion}">Version ${version.versionKey}</span>
+                	<span>(<fmt:formatDate value="${version.date}" type="both" dateStyle="short" timeStyle="short"/>)</span>
+                	<span class="infoBubble" title="${version.description}">i</span>
+               	
                 	<div class="options">
                 		<div class="download dropdown">
 	                		<button class="dropdown-btn btn btn-bright">Download</button>
@@ -71,6 +58,19 @@
 	                	</div>
                 		<a href="${deleteLink}/${institution.institutionId}/${version.versionKey}" class="delete" title="delete"></a>
                 	</div>
+                	
+                	<c:set var="indexStates" value="${version.indexStates}"/>
+                	<c:if test="${not empty indexStates}">
+                		<div class="indexStates">
+                			<span>auf</span>
+                			<c:forEach var="indexState" items="${indexStates}" varStatus="loop">
+	                			<span>
+	                				${indexState.coreName}
+	                				<span class="infoBubble" title="${indexState.origin.description}">i</span>${!loop.last ? ',' : ''}
+	                			</span>
+	                		</c:forEach>
+                		</div>
+                	</c:if>
                 </li>
             </c:forEach>
         </ul>
