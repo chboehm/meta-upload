@@ -12,31 +12,47 @@
 
     <!-- Solr -->
     <bean id="defaultSolrCore" class="de.idadachverband.solr.SolrCore">
-        <constructor-arg index="0" value="Meta"/>
-        <constructor-arg index="1" value="${solr.url}"/>
+        <constructor-arg index="0" value="Stage"/>
+        <constructor-arg index="1" value="${solr.url.stage}"/>
     </bean>
 
     <bean id="liveSolrCore" class="de.idadachverband.solr.SolrCore">
-        <constructor-arg index="0" value="Meta-Live"/>
-        <constructor-arg index="1" value="${solr.url}"/>
+        <constructor-arg index="0" value="Live"/>
+        <constructor-arg index="1" value="${solr.url.live}"/>
+    </bean>
+
+    <bean id="devSolrCore" class="de.idadachverband.solr.SolrCore">
+        <constructor-arg index="0" value="Dev"/>
+        <constructor-arg index="1" value="${solr.url.dev}"/>
     </bean>
     
     <util:set id="solrCoreSet" set-class="java.util.HashSet" value-type="de.idadachverband.solr.SolrCore">
         <ref bean="defaultSolrCore"/>
         <ref bean="liveSolrCore"/>
+        <ref bean="devSolrCore"/>
     </util:set>
 
     <!-- Vufind -->
-    
     <bean id="stageInstance" class="de.idadachverband.vufind.VufindInstanceBean">
-    		<constructor-arg index="0" name="instanceId" value="Meta"/>
-        	<constructor-arg index="1" name="url" value="${stage.url}"/>
-        	<constructor-arg index="2" name="publicUrl" value="http://stage.meta-katalog.de"/>
+   		<constructor-arg index="0" name="instanceId" value="Stage"/>
+       	<constructor-arg index="1" name="url" value="${vufind.url.stage}"/>
+   	</bean>
+
+    <bean id="liveInstance" class="de.idadachverband.vufind.VufindInstanceBean">
+   		<constructor-arg index="0" name="instanceId" value="Live"/>
+       	<constructor-arg index="1" name="url" value="${vufind.url.live}"/>
+   	</bean>
+
+    <bean id="devInstance" class="de.idadachverband.vufind.VufindInstanceBean">
+   		<constructor-arg index="0" name="instanceId" value="Dev"/>
+       	<constructor-arg index="1" name="url" value="${vufind.url.dev}"/>
    	</bean>
     
     <util:set id="vufindInstanceSet" set-class="java.util.HashSet"
     		  value-type="de.idadachverband.vufind.VufindInstanceBean">
     	<ref bean="stageInstance"/>
+    	<ref bean="liveInstance"/>
+    	<ref bean="devInstance"/>
  	</util:set>
 
     <!-- XSLT -->
@@ -296,12 +312,12 @@
         <ref bean="schemaf"/>
         <ref bean="hla"/>
         <ref bean="kfgv"/>
-	<ref bean="fnwien"/>
-	<ref bean="fsadresden"/>
-	<ref bean="basel" />
-	<ref bean="hamburg" />
-	<ref bean="bozen" />
-	<ref bean="lll" />
+		<ref bean="fnwien"/>
+		<ref bean="fsadresden"/>
+		<ref bean="basel" />
+		<ref bean="hamburg" />
+		<ref bean="bozen" />
+		<ref bean="lll" />
     </util:set>
 
     <bean id="workingFormatTransformer" class="de.idadachverband.transform.xslt.WorkingFormatToSolrDocumentTransformer"
@@ -346,6 +362,6 @@
     </bean>
     
     <bean id="maxArchivedVersions" class="java.lang.Integer">
-    	<constructor-arg value="6"/>
+    	<constructor-arg value="4"/>
     </bean>
 </beans>

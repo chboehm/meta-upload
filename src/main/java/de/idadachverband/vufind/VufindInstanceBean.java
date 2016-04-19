@@ -18,9 +18,9 @@ public class VufindInstanceBean
     
     private final HierarchyCacheDeleteMethod hierarchyCacheDeleteMethod;
 
-    public VufindInstanceBean(String instanceId, String url, String publicUrl)
+    public VufindInstanceBean(String instanceId, String url)
     {
-        this(instanceId, url, publicUrl, instanceId, "/HierarchyHelper?institution=$institutionId", "$institutionId");
+        this(instanceId, url, url, instanceId, "/HierarchyHelper?institution=$institutionId", "$institutionId");
     }
     
     public VufindInstanceBean(String instanceId, String url, String publicUrl, String coreName,

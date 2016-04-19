@@ -3,7 +3,7 @@ Hallo ${user}!
 <#if job.failure>
 Die Daten konnten nicht umgewandelt werden. <#if !admin>Bitte kontaktieren Sie die Servicestelle.</#if>
 <#else>
-Die Daten wurden erfolgreich eingespielt. <#if job.transformation??>Bitte überprüfen Sie die Daten auf ${urlHelper.getVufindInstanceUrl(job.transformation.solrCore.name)}.</#if>
+Die Daten wurden erfolgreich eingespielt. <#if job.transformation??>Bitte überprüfen Sie die Daten auf ${urlHelper.getVufindInstanceUrl(job.transformation.coreName)}.</#if>
 </#if>
 <#if admin>
 
