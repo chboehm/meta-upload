@@ -61,7 +61,7 @@ public class ResultStateController
                         transformation.getInstitutionId(), 
                         transformation.getArchivedVersion().toString());
                 result.add("path", path.toString());
-                result.add("instanceUrl", idaUrlHelper.getVufindInstanceUrl(transformation.getSolrCore().getName()));
+                result.add("instanceUrl", idaUrlHelper.getVufindInstanceUrl(transformation.getCoreName()));
             }
         }
         if (state == FAILURE)

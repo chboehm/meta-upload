@@ -3,6 +3,7 @@ package de.idadachverband.upload;
 import de.idadachverband.archive.VersionKey;
 import de.idadachverband.job.JobProgressService;
 import de.idadachverband.process.ProcessJobBean;
+import de.idadachverband.result.IdaUrlHelper;
 import de.idadachverband.result.ResultStateController;
 import de.idadachverband.transform.TransformationBean;
 
@@ -35,7 +36,10 @@ public class ResultStateControllerTest
     
     @Mock
     private TransformationBean transformation;
-
+    
+    @Mock
+    private IdaUrlHelper urlHelper;
+    
     @InjectMocks
     private ResultStateController cut;
 
@@ -64,7 +68,6 @@ public class ResultStateControllerTest
     public void getResultProcessing() throws Exception
     {
         when(processService.getState(jobId)).thenReturn(PROCESSING);
-
         String actual = cut.getResult(jobId);
 
         JsonObject jsonObject = Json.createReader(new StringReader(actual)).readObject();
@@ -82,13 +85,14 @@ public class ResultStateControllerTest
         when(transformation.getCoreName()).thenReturn("corename");
         when(transformation.getInstitutionId()).thenReturn("institution");
         when(transformation.getArchivedVersion()).thenReturn(new VersionKey(1,0));
-
+        when(urlHelper.getVufindInstanceUrl("corename")).thenReturn("vufindUrl");
         String actual = cut.getResult(jobId);
 
         JsonObject jsonObject = Json.createReader(new StringReader(actual)).readObject();
         assertThat(jsonObject.getString("state"), Matchers.is(SUCCESS.toString()));
         assertThat(jsonObject.getString("jobId"), Matchers.is(jobId));
-        assertThat(jsonObject.getString("path"), Matchers.equalTo(Paths.get("corename", "institution", "1.0").toString()));
+        assertThat(jsonObject.getString("path"), Matchers.equalTo(Paths.get("institution", "1.0").toString()));
         assertThat(jsonObject.getString("message"), Matchers.equalTo("message"));
+        assertThat(jsonObject.getString("instanceUrl"), Matchers.equalTo("vufindUrl"));
     }
 }
