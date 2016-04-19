@@ -341,6 +341,7 @@
                 <prop key="mail.transport.protocol">smtp</prop>
                 <prop key="mail.smtp.auth">${smtp.auth}</prop>
                 <prop key="mail.smtp.starttls.enable">${smtp.starttls}</prop>
+                <prop key="mail.smtp.ssl.enable">${smtp.ssl}</prop>
             </props>
         </property>
     </bean>
